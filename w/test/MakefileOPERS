@@ -1,0 +1,29 @@
+###################################################################
+#
+#   Link the m_util_r8_c_w.f and ops.inc files to this location 
+# 
+#   ln -s ../src/m_util_r8_c_w.f .
+#   ln -s ../src/ops.inc
+#
+###################################################################
+# Change the F77 and F77_LOAD acordengly
+###################################################################
+
+SHELL = /bin/sh
+
+F77       = gfortran -O6 -fno-second-underscore  -I/usr/local/include
+F77_LOAD  = gfortran -O6 -fno-second-underscore -L../../../lib -L/usr/local/lib -L/usr/X11R6/lib   -L/usr/local/lib
+
+SODELIBS =  -lodepack -llinpack -llapack -lblas
+FLIBS     =  -lrnpl  -lxvs -lvutil
+
+.f.o:
+	$(F77) -c $*.f
+
+ttestOPERS:  ttestOPERS.o initialize_fvOPERS.o  m_util_r8_c_w.o output_fOPERS.o
+	$(F77_LOAD) $(INCF)  ttestOPERS.o initialize_fvOPERS.o  m_util_r8_c_w.o  output_fOPERS.o $(SODELIBS) $(FLIBS) -o ttestOPERS
+
+clean: 
+	rm *.sdf *.o ttestOPERS > /dev/null 2>&1
+clean_sdf:
+	rm *.sdf > /dev/null 2>&1

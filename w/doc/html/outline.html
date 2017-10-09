@@ -1,0 +1,49 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>AMRD/PAMR nbs example</title>
+</head>
+<body>
+<h4>AMRD/PAMR Newtonian Boson Star (nbs) example code</h4>
+<span style="font-weight: bold;"><span style="font-weight: bold;"></span></span><br>
+<hr style="width: 100%; height: 2px;"><span style="font-style: italic;"><br>
+</span><span style="font-weight: bold;">PAMR</span> (Parallel Adaptive
+Mesh Refinement) features:<span style="font-style: italic;"><br>
+</span>
+<ul>
+  <li>manages distributed grid hierarchies of the type we tend to use
+for finite-difference based solution of field equations</li>
+  <li>functions to synchronize/interpolate/inject grid functions within
+a hierachy</li>
+  <li>internally stores the relevant data structures, and provides a
+complete set of functions to set/query the relevant structures</li>
+</ul>
+<span style="font-weight: bold;">AMRD</span> (Adaptive Mesh Refinement
+Driver) features:<br>
+<ul>
+  <li>implements a Berger and Oliger AMR driver (with modifications to
+incorporate elliptic equations, and hence provides a FAS multigrid (MG)
+algorithm)<br>
+  </li>
+  <li>uses PAMR to handle parallel support and data-structure management</li>
+  <li>problem specific variables/grid-parameters/etc. specified using a
+text parameter file (using RNPL-style variables)</li>
+  <li>numeric algorithm is hard-coded; problem specific code is called
+at fixed locations within the algorithm</li>
+</ul>
+<span style="font-weight: bold;">NBS</span> example:<br>
+<br>
+in the following pseudo code listings, user "hook" functions are shown
+in <span style="color: rgb(51, 51, 255);">blue()</span>; <br>
+<ul>
+  <li><a href="AMRD_top_level_flow.html">source files, and AMRD
+top-level flow</a></li>
+  <li><a href="AMRD_MG_flow.html">AMRD MG algorithm</a></li>
+  <li><a href="AMRD_evolution_flow.html">AMRD evolution algorithm</a></li>
+</ul>
+<br>
+<span style="font-style: italic;"></span>
+</body>
+</html>

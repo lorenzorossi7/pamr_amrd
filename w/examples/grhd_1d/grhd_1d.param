@@ -1,0 +1,126 @@
+#---------- GRHD_1D fixed parameter file ----------------------------------
+dim := 1
+num_evo_tl := 2
+ic_n := 2
+
+v_tag := "_v"
+
+hyperbolic_vars       := [ "Sr" "tau" "d" ]
+elliptic_vars         := [ "alpha_v" "beta_v" "psi_v" ]
+elliptic_vars_t0      := [ "psi0_v" ]
+fc_vars               := [ "Sr" "tau" "d" ]
+AMRH_work_vars        := [ "rho" "v" "u" "P" "T" "cs" "jr" "jr_v" "rhops" "rhops_v" "alpha" "beta" "psi" "ham_v" "tau_v" "ham_source" "ham_source_v" "Sr_p" "tau_p" "d_p" "psi_p_v" ]
+AMRH_work_in_MGH_vars := [ "jr_v" "rhops_v" "ham_source_v" ]
+
+app_name := ["1D GR Hydro Code"]
+
+ghost_width := [2]
+t0 := 0
+
+amr_inject    := [ "Sr" "tau" "d" "psi_v" ]
+amr_sync      := [ "Sr" "tau" "d" "rho" "psi_v" ]
+amr_interp2   := [ "Sr" "tau" "d" "psi_v" ]
+amr_transfer2 := [ "Sr" "tau" "d" "psi_v" "alpha_v" "beta_v" ]
+
+amr_c_to_v2 := [ "jr" "rhops" "tau" "ham_source" ]
+amr_v_to_c2 := [ "alpha_v" "beta_v" "psi_v" ]
+mg_hw_restr := [ "alpha_v" "beta_v" "jr_v" "rhops_v" "psi_v" "ham_source_v" "psi0_v" ]
+mg_sync     := [ "alpha_v" "beta_v" "psi0_v" "psi_v" ]
+mg_interp2  := [ "alpha_v" "beta_v" "psi0_v" "psi_v" ]
+interp_AMR_bdy_vars  := [ "alpha_v" "beta_v" "psi_v" ]
+interp_AMR_bdy_order := 2
+rg_diss_vars := [ "alpha_v" "alpha_extrap_tm1_v" "alpha_extrap_tm2_v" "beta_v" "beta_extrap_tm1_v" "beta_extrap_tm2_v" "psi_v" "psi_extrap_tm1_v" "psi_extrap_tm2_v" ]
+tn_eps_diss := 0.0
+tn_diss_vars := [ "psi_v" ]
+
+even_vars_x0_min := [ "psi_v" ]
+even_vars_x1_min := [ "psi_v" ]
+even_vars_x2_min := [ "psi_v" ]
+MG_cnst_data_vars := [ "psi_v" ]
+
+#---------- GRHD_1D run-time parameter file -------------------------------
+
+limiter := 1
+rho0_c := 5.0
+echo_params := 1
+pamr_trace_lev := 0
+evo_trace := 4
+MG_trace := 0
+MG_DV_trace := 0
+evo_DV_trace := 0
+ID_DV_trace := 0
+MG_DV_trace_t_on = 0.0
+MG_DV_trace_t_off = 0.0
+
+eos_flag := 1
+rho0 := 1.0e14
+Ye := 0.1
+temperature := 1.160445e10
+p_deplete := 1.00
+v_pert := 0.0
+ascii_dump_int := 200
+atm_frac := 1.0e-6
+deltat1 := 0.47
+deltat2 := 0.1
+const_ev := 0
+#--------------------------------------------------------------------------
+
+base_shape := [ 257 ]
+base_bbox := [0.0 0.512]
+max_lev := 1
+min_width := [5]
+min_mg_cwidth := [5]
+lambda := 0.50
+rho_sp := 2
+rho_tm := 2
+
+t_interp_substeps := [0 0.5 1.0]
+num_TRE_max_hydro = 3
+TRE_max_hydro = [ 1.0  0.01  0.01]
+
+gdm_method := 1
+
+steps := 2001
+evo_max_iter := 13
+evo_min_iter := 3
+MG_start_iter := 4
+MG_max_iter := 10
+MG_min_iter := 1
+MG_max_citer := 5000
+MG_pre_swp := 3
+MG_pst_swp := 3
+skip_frg := 1
+evo_ssc := 0
+
+AMR_bdy_width := 3
+AMR_bdy_width_c := 2
+re_interp_width := 3
+re_interp_width_c := 2
+
+id_method := 0
+
+np1_initial_guess := 1
+io_node := 0
+
+evo_tol := 1e-2
+MG_tol := 1e-5
+MG_crtol := 1e-5
+MG_w0 := 1.0
+MG_extrap_method := 0
+MG_eps_c := 1.0
+regrid_interval := 10000024
+TRE_norm := 1
+TRE_ibc_buffer := 4
+regrid_script := 0
+regrid_script_name = "grhd_1d_L0.rgs"
+
+#save_1_vars := [ "rho" "v" "alpha_v" "beta_v" "psi_v" "ham_v" ]
+
+cls_merge_dist := 4
+cls_method := 0
+cls_align_mode := 1
+
+save_tag := "grhd_1d_"
+
+save_ivec := 1-*/1
+#-----------------------------------------------------

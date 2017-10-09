@@ -1,0 +1,165 @@
+--- 1) When a grid shape is 1 behavior can be "incorrect". Such
+    grids will *not* be supported in the near future.
+    In particular, interpolation onto such sheets in 3D seems to 
+    fail (affects PAMR_interp and PAMR_AMR_bdy_interp, regridding, etc.)
+
+--- 2) physical boundary flags not implemented yet
+
+--- 3) The manner in which restriction is currently implemented,
+    the interior stencils will *not* always be applied across grid
+    boundaries of overlapping grids. To do so would require 1) a more complicated
+    ownership calculation than what is done now, or 2) we could possibly
+    extend owned grids by irho in all directions. For 2), this will work
+    because the order in which the restrictions are applied is along
+    that of ownership, hence, typically the owned regions that can be
+    extended into the interior (and hence still use interior stencils)
+    will overwrite the prior copies. This should not result in much of speed
+    penalty, but for now ignore because I suspect this will not adversely
+    affect MG. (and for AMR we use straight injection, for which this
+    is not an issue)
+
+    --> Actually, in some rare instances it looks like using a boundary restriction
+    operator interior to a domain can be problematic. See the second piece
+    of 5) for the attempted fix.
+
+--- 4) An interesting comment re. red-black relaxation in parallel:
+    in principle, one could solve the MG equations with ghostwidth=1, 
+    however, trying that with app_nbs failed. This did not seem to be
+    a bug in PAMR (i.e., communication seemed to be OK), rather the reason 
+    appeared to be that the alternating nature of rb-smoothed was not 
+    being preserved across parallel boundaries. To cure (if we wanted),
+    we would presumably need to globally define red/black squares... 
+    with ghostwidth=2 this luckily happens automatically.
+
+--- 5) There are typically small differences between results run
+    on n nodes vs. the *same* grid structure distributed on m, m<n
+    nodes (e.g., often specifying 7 nodes will result in the same g.s. as
+    8 nodes, but 1 node is overloaded). The reason (I think ... after
+    hours of trying to isolated the difference this was the only thing
+    I could come up with) is that the order of transfers performed is
+    different, and if two sources write to the same destination
+    but at adjacent locations, so that the two source boundaries
+    touch, then the result their could depend on the order in which
+    the sources are written. In particular, this happens when using 
+    HW or FW restriction and the the given source boundary is the 
+    actual boundary of that grid, so that the reduced stencil is
+    used. Straight injection is OK ... I didn't test interpolation.
+
+    This is a minimal effect, so I'm not going to address it now.
+    What I will do, which may avoid this situation from occuring in practices,
+    is use the 'interior' only option for injection when creating the
+    owned list, but only use the ghost-zone to define interior (i.e., not the
+    AMR boundary). Thus, with a sufficient ghost zone, boundary restriction
+    operators should never be used.
+
+    ==> removing AMR_bdy_width attribute ... effectively replacing with a 
+    parameter in PAMR_bdy_interp
+
+6)  PAMR trace_lev=3 (producing sdf output), possibly has an effect on the
+    results ... I noticed this when fudging with n_rank, so it may be OK
+    during 'legitimate' opertion.
+
+7)  PAMR (AMRD?) does not always sync properly when a small grid is divided into 
+    many pieces. --> results in failure to converge messages
+   
+8)  PAMR does not currently guarantee single-valuedness during for 
+    certain grid configurations, during interpolation and possibly restriction.
+    AMRD covers this up by explicitly sync'ing in key places ... We may
+    want to 'fix' PAMR (may not be bugs, but unforseen grid-overlaps) to
+    always guarantee that communication functions produce single-valued 
+    functions.
+
+9)  PAMR cannot currently handle user-generated grid-overlap very effectively. 
+    In particular, when calculating ownership, it only knows about ghostzone's
+    that it added (i.e. sync'ing still works, and produces singled valued functions,
+    but it may define the piece of a boundary of one grid in the overlap
+    region as owned, and copy it to an interior of another).
+
+    eg. below, points marked 'x' in grid 1 should be considered ghost,
+        but PAMR cannot calculate this
+
+
+    ----------------
+    | 1            |
+    |              |
+    |         -----|-------
+    |         |  xx|    2 |
+    |         |  xx|      |
+    |         |  xx|      |
+    |         -----|-------
+    |              |
+    |              |
+    ----------------
+
+    one option would be to have PAMR split the grids as follows, and then
+    it can use the usual machinery to define the appropriate edges of
+    grids 2 and 4 as ghost boundaries.
+    (NOTE: for simplicity I have not drawn the up/down ghost regions
+    that need to be added to grids 1,2 &3)
+
+    ----------------
+    | 1            |
+    |              |
+    ------------|--|--|----
+    | 2         |xx|xx| 4 |
+    |           |xx|xx|   |
+    |           |xx|xx|   |
+    ------------|--|--|----
+    | 3            |
+    |              |
+    ----------------
+
+    In current work-around we only communicate AMR boundaries on first iteration
+    of relaxation sweeps.
+
+    Also, these overlapping grids can cause problems for interpolation
+
+    ----------------
+    | 1            |
+    |              |
+    |         -----|-------
+    |         |    |    2 |
+    |         |    |      |
+    |         | ---|----  |
+    |         | |  | 3 |  |
+    |         | ---|----  |
+    |         |    |      |
+    |         |    |      |
+    |         -----|-------
+    |              |
+    |              |
+    ----------------
+
+    Suppose 1 and 2 are on the coarse level and 3 is on the fine level.
+    Then you want to interpolate from coarse to fine.  In the ownership
+    calcuation, you will get a 1 coarse-cell wide gap between the owned
+    regions of 1 and 2.  extend_gsl will not be able to fix this, since
+    you can't exend 1.  Then you will get an error on the fine grid.
+    This kind of error afflicts cell centers for PAMR_AMR_bdy_interp, 
+    PAMR_interp, and regridding.
+
+
+10) In evolve(), we build the MG hierarhcy at the initial iteration, and
+    do *not* inject 'source' functions during the iteration. I.e., effectively
+    the coarse level source functions correspond to time level tn, while
+    the fine level source functions correspond to time level tnp1. 
+    I think this will *not* be problematic in general, for the truncation
+    error added to the rhs on coarse levels should compensate (an experiment
+    in 1 situations suggested using source function on coarse levels is OK).
+
+11) There are (at least) two bugs that I haven't tracked down yet:
+
+    1) this one I think has only shown up with intel compilers ... 
+       there'll be an error on a PAMR_sync during the tstep part
+       of the algorithm, saying "invalid level 0". Problem is
+       that the lev variable changes from lev to 0 somwhere during
+       the app_evolve call. Suggests memory is getting trashed.
+       e.g. with gh3d, turning on a local trace statement stops this.
+       So may be a problem with gh3d, but don't know
+
+    2) With certain # of processors, turning on MG_DV_trace (with gh3d
+       specifically) messes up future evolution ... again, suggestion
+       is that somewhere memory is being trashed (but I don't think
+       it's mg_dump).
+
+12) Need a hook to initialize elliptic_vars_t0

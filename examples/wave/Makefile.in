@@ -1,0 +1,86 @@
+.IGNORE:
+
+SHELL = /bin/sh
+
+prefix = @prefix@
+BBH_SYSTEM = @BBH_SYSTEM@
+bindir = ../../bin
+
+BBH_SYSTEM = @BBH_SYSTEM@
+
+RNPL   = rnpl
+
+AR     = @AR@
+RANLIB = @RANLIB@
+
+F77_TRANSFORM = @F77_TRANSFORM@
+
+LIBS       = -lpamr -lamrd $(MPILIB) @LIBS@ @CCF77LIBS@ 
+LDFLAGS    = -L../../lib @LDFLAGS@ -L. -L$(prefix)/lib @BBH_MISC_FLFLAGS@ \
+             @APP_LIB_PATHS@
+
+CC       = @CC@
+CFLAGS     = @CFLAGS@ 
+CPPFLAGS = -I. @CPPFLAGS@ -I../../include -I$(prefix)/include \
+           @APP_INCLUDE_PATHS@
+
+CC_COMP  = $(CC) $(CPPFLAGS) -c $(CFLAGS)
+CC_LOAD  = $(CC) $(CFLAGS) $(LDFLAGS) 
+
+F77      = @F77@
+F77FLAGS = @F77FLAGS@
+
+F77_COMP   = $(F77) -c $(F77FLAGS) 
+F77_LOAD   = $(F77) $(F77FLAGS) $(F77_LDFLAGS) $(LDFLAGS) 
+
+EXECUTABLES     = wave 
+# Miscellaneous files to clean up
+MISCDATAFILES   =
+
+SRC = *.f *.inc
+
+all: $(EXECUTABLES)
+
+.f.o:
+	$(F77_COMP) $*.f 
+
+.c.o:
+	@CC_TRANSFORM@ $*.c > $*_.c
+	$(CC_COMP) -c $*_.c
+	mv $*_.o $*.o
+
+all: $(EXECUTABLES)
+
+install: all
+
+full: install confidence_tests
+
+confidence_tests:
+	echo "Not implemented yet"
+
+translate: 
+	touch translate
+
+wave.o: wave.h 
+
+WAVE_OBJS = wave.o sf_evo.o 
+wave: $(WAVE_OBJS) 
+	$(CC_LOAD) $(WAVE_OBJS) $(LIBS) -o wave
+	cp wave $(bindir)
+
+########################################################################
+# Clean-up
+########################################################################
+clean:
+	/bin/rm $(EXECUTABLES)
+	/bin/rm *_.c > /dev/null 2>&1 
+	/bin/rm *.o 
+	/bin/rm *.a
+	/bin/rm *.sdf
+	/bin/rm *.segdat
+	/bin/rm *~
+	/bin/rm  Makefile config.cache config.log config.status
+	/bin/rm $(MISCDATAFILES)
+	/bin/rm run*/*.sdf
+	/bin/rm run*/*.dat
+	/bin/rm run*/mfile

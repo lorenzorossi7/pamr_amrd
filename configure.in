@@ -1,0 +1,35 @@
+dnl Process this file with autoconf to produce a configure script.
+
+AC_INIT(Makefile.in)
+
+dnl Determine system type
+BBH_SYS_GETSYSTEM
+
+dnl Checks for programs
+AC_PROG_CC
+AC_CHECK_PROG(PERL,perl,perl,no)
+AC_CHECK_PROG(RANLIB,ranlib,ranlib,touch)
+AC_CHECK_PROG(AR,ar,ar,touch)
+
+BBH_F77_CONFIGURE
+
+AC_CHECK_LIB(mpi, MPI_Comm_rank)
+AC_CHECK_LIB(m, sin)
+AC_CHECK_HEADER(mpi.h,,echo "mpi.h not found.  Is MPI installed on this machine?";)
+dnl bbhutil.h requires strdup, will be supplied if non-existent
+AC_CHECK_FUNCS(strdup)
+BBH_CHECK_HEADERS("bbhutil.h",
+                  "$INCLUDE_PATHS /usr/local/include/ /usr/local/mpi/include",
+                  APP_INCLUDE_PATHS,yes) 
+BBH_CHECK_LIBS("bbhutil",
+               "$LIB_PATHS /usr/lib64 /usr/lib /usr/local/lib /usr/local/mpi/lib",
+               APP_LIB_PATHS,LIBS,yes)
+
+AC_SUBST(BBH_DEFS)
+
+AC_OUTPUT( \
+	 Makefile src/Makefile test/Makefile amrd/Makefile \
+	 examples/wave/Makefile examples/nbs/Makefile doc/Makefile \
+	 w/Makefile w/src/Makefile w/test/Makefile w/amrd/Makefile \
+	 w/examples/wave/Makefile w/examples/nbs/Makefile w/doc/Makefile \
+)

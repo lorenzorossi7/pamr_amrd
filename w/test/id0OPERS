@@ -1,0 +1,42 @@
+
+level      := 0
+
+xmin       := -10.0
+xmax       :=  10.0
+ymin       := -10.0
+ymax       :=  10.0
+zmin       := -10.0
+zmax       :=  10.0
+xminf      := -10.0
+xmaxf      :=   0.0
+yminf      := -10.0
+ymaxf      :=   0.0
+zminf      := -10.0
+zmaxf      :=   0.0
+
+x0         := 0.0
+y0         := 0.0
+z0         := 0.0
+sigx       := 5.0
+sigy       := 5.0
+sigz       := 5.0
+Nx0        := 32
+Ny0        := 32
+Nz0        := 32
+amp        := 1.0
+# order = 1 is second order
+order      := 1
+type       := 0
+dim        := 2
+i1         := 14
+j1         := 14
+k1         := 14
+i2         := 1
+j2         := 1 
+k2         := 1
+ni         := 17
+nj         := 9
+nk         := 5
+nxf        := 33
+nyf        := 33
+nzf        := 9

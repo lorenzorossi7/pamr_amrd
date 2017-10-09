@@ -1,0 +1,4 @@
+a doit 'RM *.sdf; RM nbs; make; cat amrd_nbs.fparam amrd_nbs.rtparam > nbs.param; nbs nbs.param'
+a mdoit 'RM *.sdf; RM nbs; make; cat amrd_nbs.fparam amrd_nbs.rtparam > nbs.param; nice /usr/local2/mpich-1.2.4/bin/mpirun -np \!* -machinefile machine_file nbs nbs.param'
+a virp 'vi amrd_nbs.rtparam'
+a vifp 'vi amrd_nbs.fparam'

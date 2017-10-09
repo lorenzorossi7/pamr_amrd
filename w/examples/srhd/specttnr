@@ -1,0 +1,4 @@
+c
+      parameter (nrmax=410, nrmaxp=nrmax+1, nrmax3=nrmax*3)
+      parameter (maxcore=0)
+c

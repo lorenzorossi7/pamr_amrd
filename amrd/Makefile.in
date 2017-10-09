@@ -1,0 +1,82 @@
+.IGNORE:
+
+SHELL = /bin/sh
+
+# PATHS
+
+prefix  = @prefix@
+bindir = $(prefix)/bin
+includedir = $(prefix)/include
+libdir = $(prefix)/lib
+
+BBH_SYSTEM = @BBH_SYSTEM@
+
+CC     = @CC@
+AR     = @AR@
+RANLIB = @RANLIB@
+
+LIBS       = -lpamr $(MPILIB) @LIBS@ @CCF77LIBS@ 
+LDFLAGS    = -L../lib @LDFLAGS@ -L. @APP_LIB_PATHS@ 
+CPPFLAGS   = -I. -I../include @CPPFLAGS@ -I$(prefix)/include @APP_INCLUDE_PATHS@ @DEFS@ @BBH_DEFS@
+CFLAGS     = @CFLAGS@ 
+
+CTOF     = mfi
+PERL     = @PERL@ 
+
+F77      = @F77@
+F77FLAGS = @F77FLAGS@
+
+CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)
+CC_LOAD    = $(CC) $(CFLAGS) $(LDFLAGS) 
+
+F77_COMP   = $(F77) $(F77FLAGS) 
+F77_LOAD   = $(F77) $(F77FLAGS) $(LDFLAGS) 
+
+F77_TRANSFORM = touch
+
+OBJECTS = amrd.o globals.o io.o util.o evolve.o mg.o cls.o regrid_script.o
+HEADERS = globals.h io.h util.h evolve.h mg.h cls.h ../include/amrd.h regrid_script.h
+
+.f.o:
+	$(F77_COMP) -c $*.f
+
+.c.o:
+	@CC_TRANSFORM@ $*.c > $*_.c
+	$(CC_COMP) -c $*_.c
+	mv $*_.o $*.o
+
+# targets
+
+all: libamrd.a 
+
+amrd.o: amrd.c $(HEADERS)
+globals.o: globals.c $(HEADERS)
+io.o: io.c $(HEADERS)
+mg.o: mg.c $(HEADERS)
+cls.o: cls.c $(HEADERS)
+evolve.o: evolve.c $(HEADERS)
+util.o: util.c $(HEADERS)
+regrid_script.o: regrid_script.c $(HEADERS)
+
+libamrd.a: $(OBJECTS)
+	$(AR) r libamrd.a $(OBJECTS) 
+
+install: libamrd.a
+	cp libamrd.a ../lib/
+
+debug: libamrd.a
+	if test ! -d $(libdir); then\
+		mkdir $(libdir);\
+	fi
+	cp libamrd.a $(libdir)/libamrd_dbg.a
+
+clean:
+	echo; echo "Cleaning up"
+	rm libamrd.a > /dev/null 2>&1
+	rm *_.c > /dev/null 2>&1
+	rm *.o > /dev/null 2>&1
+	rm *~ > /dev/null
+	rm *.sdf > /dev/null 2>&1
+	rm config.cache config.log config.status > /dev/null 2>&1
+	rm work.pc work.pcl > /dev/null 2>&1
+	rm Makefile > /dev/null 2>&1

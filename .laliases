@@ -1,0 +1,6 @@
+a doit1 'RM *.sdf; mpirun -np 2 -machinefile machine_file test1 \!*'
+a conf 'make clean; configure --prefix=/home/fpretori'
+a cleanipcs '/usr/local2/mpich-1.2.4/sbin/cleanipcs'
+a u 'cvs update -d'
+a c 'cvs commit -m ""'
+cat .laliases

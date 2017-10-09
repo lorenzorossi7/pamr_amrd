@@ -1,0 +1,127 @@
+TODO:
+-----
+
+*** : something we need but no-one is yet 'scheduled' to work on it
+
+1. Underlying infrasture
+
+   FP --- PAMR: "compiles", passed a few simple tests, but still a few bugs
+         and more testing needed before full tests of 
+         operators/model problem can beging.
+
+         Currently working on "SYNC_TEST" in pamr/w/test/test3_w.c ... when
+         this has passed (still at least one bug) will start testing
+         the rest of test3_w.c
+
+   ***   need a more automated testing code that doesn't rely on visual
+         comparison in DV of randomly generated grids
+
+   FP --- AMRD: nothing yet
+         a) basic infrastructure: update calls to the new PAMR, and 
+            add support for defining the new class of variables,
+            operator types, etc.
+         b) extensions: support for time sub-stepping (e.g. Rung Kutta),
+            option to save elliptic_vars_t0
+
+2. PAMR CC and CV->VC operators:
+
+   use status level: 0 not yet implemented
+                     1 implementation w/out excision in progress
+                     2 implemented w/out excision but not tested
+                     3 implemented w/out excision and fully tested
+                     4 support for excision in progress
+                     5 excision support completed but not tested
+                     6 operator fully implemented and tested
+
+   CC fine to coarse restriction:
+
+   AJP : PAMR_NN_AVERAGE [ in dmavg3d_c() ] : status ?
+
+   CC coarse to fine interpolation:
+
+   IO : PAMR_FIRST_ORDER_CONS [ in dminterp3d() ]: It passes naive test
+   DC : PAMR_SECOND_ORDER     [ in dminterp3d() ]: status ?
+   *** : PAMR_FOURTH_ORDER     [ in dminterp3d() ]: status ?
+   *** : PAMR_SECOND_ORDER_ENO [ in dminterp3d() ]: status ?
+   *** : PAMR_FOURTH_ORDER_ENO [ in dminterp3d() ]: status ?
+   
+   CC -> VC:
+
+   SCN : PAMR_C_TO_V_SECOND_ORDER     [ in dm_c_to_v() ] : It passes naive test
+   *** : PAMR_C_TO_V_FOURTH_ORDER     [ in dm_c_to_v() ] : status ?
+   *** : PAMR_C_TO_V_SECOND_ORDER_ENO [ in dm_c_to_v() ] : status ?
+   *** : PAMR_C_TO_V_FOURTH_ORDER_ENO [ in dm_c_to_v() ] : status ?
+
+   VC -> CC:
+
+   SCN : PAMR_V_TO_C_SECOND_ORDER [ in dm_c_to_v() ] : It passes naive test
+   *** : PAMR_V_TO_C_FOURTH_ORDER [ in dm_c_to_v() ] : status ?
+
+   CC repopulate: (only for excision)
+
+   *** : PAMR_??? (presumably same as interpolation) [ in dmrepop3d1_c() ]: status ?
+                  
+3. example codes
+
+   ***  nbs and wave need interfaces updated and verification that
+        identical results are produced with new library
+        ==> this could be done as soon as the AMRD has been updated
+        to use the call the new PAMR functions
+
+   AJP: unigrid nsrbs : currently in "2006-06-flamr-2" CVS; eventually
+        add to pamr/examples.
+        need a few 'good' unigrid benchmark evolutions, in 3D and
+        'effective' 1D and 2D (need to update initial conditions
+        for 1&2D problems), convergence tested, etc. For the moment 
+        no excision. 
+
+   ***  AMR nsrbs : once all the underlying PAMR, and basic AMRD 
+        infrastructure is complete, need to write the
+        unigrid nsrbs wrapper, and thoroughly test.
+
+   *** other example codes: "original" model problem, burgers equation,
+   etc.
+        
+4. DV - FP
+
+   we need to think a bit about how we want to visualize CC data
+   in DV. "easy" for unigrid, but with AMR there are issues,
+   especially in 3D when taking a slices, as cell centers are 
+   effectively staggered going from level to level. Also, it would
+   be useful once completed to import some of the above operators
+   (especially CC->VC and vice-versa) into DV.
+
+===============================================================
+
+NOTES
+
+communicate(l1,l2,hierarchy,                     interior,       extend_owned,  AMR_bdy_only)
+
+sync:          communicate(l,l,hierarchy,        1+AMR_bdy_width,      0,            0,
+interpolation: communicate(lc,lc+1,hierarchy,    0,                    1,            0,
+AMR_bdy_interp:communicate(lc,lc+1,PAMR_AMRH,    0,                    1,      AMR_bdy_width,
+inject        :communicate(lf,lf-1,hierarchy,    1,                    0,            0,
+
+if (interior) --> exclude ghostwidth in def. of "owned"
++ if (interior>1) -> alloc_gsl called with interior=1 and AMR_reduce=interior-1
+
+in sync, only ever called with AMR_bdy_width=0 (first iter) or 1 (subs. iters) by AMRD
+ --> for sequential grid overlap
+
+communicate:
+
+  1) for (i=0; i<c->size; i++) src[i]=build_owned_gsl(i,gh,l1,interior,extend_owned);
+     -> alloc_gsl(.,.,bool(interior), AMR_reduce=if(interior) interior-1 else 0) :
+     -> if (owned) extend_gsl(owned,extend)
+  2) build_complete_gsl(gh,l2,AMR_bdy_only);
+     all
+     if (AMR_bdy)  extend [ all - (all-reduce) ]
+        -> extend commented out by martin
+     
+  3) for (i=0; i<c->size; i++) build_gstl(src[i],dst,&transfer_src[i],&transfer_dst[i]);
+
+  4) transfer(transfer_src,transfer_dst);
+
+alloc_gsl(interior,AMR_reduce): if (interior), excludes ghost width
+
+

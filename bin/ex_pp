@@ -1,0 +1,401 @@
+#!/usr/bin/perl 
+
+# history:
+#   ~ nov 2000  : first version
+#   Mar 30, 2001: AMR support
+#
+
+#
+# ex_pp ... an 'excision pre-processor' for RNPL.
+#
+# (/d/laplace/usr2/people/matt/scripts/makegfsh used as a reference template)
+#
+# NOTES:
+#
+#  1) nested operators will not be handled correctly
+#  2) to avoid regular expression complications, comments are
+#     stripped from the input. 
+#  3) do not use $ signs in variable names (if you even can);
+#     or anywhere outside of comments if '-s' is used.
+#  4) the last time I checked, RNPL couldn't handle nested if statements,
+#     so don't use if statements in masked expressions.
+#  5) if you want to write a #%define directive over several lines,
+#     start each additional line with a '#%'.
+#  6) we currently assume 2 time levels, and the first test
+#     sets <1>var[...]=0 if <0>mask[...]=mask_val. Thus declare single
+#     time variables with "on g1" and not "on g1 at 0".
+#  7) when using multi-indecies, always declare the set of indecies
+#     in the same order, otherwise the inconsitancy check will fail.
+#     ** though hierarchies of indecies should not be used yet!
+#        e.g D_CNDISSRHOZ -> D_CNDISSRHO | D_CNDISSZ -> D_CN
+#        wait for the 'future' enhancement
+#  8) probably case sensitive, checking for rnpl residual, if statements
+#  9) AMR might not work will all kinds of 'if' statements in the RNPL 
+#        
+# Future:
+#
+#  ==> add better support for dissipation-like stencils, mixed derivatives etc.
+#
+
+$Pgname = `basename $0`; chop $Pgname;
+$Usage = "usage: $Pgname in.rnpl.ex out.rnpl [-s]\n";
+$date=`date`; chop $date;
+$ltrace=0;
+
+&main;
+
+sub main
+{
+   die $Usage unless ($#ARGV == 1 || $#ARGV ==2);
+   $in_file=$ARGV[0]; 
+   $out_file=$ARGV[1]; 
+   $option=$ARGV[2]; 
+
+   die "ERROR: $in_file does not exists\n" unless -T $in_file;
+   die "ERROR: input and output files must be different\n" unless (!($in_file =~ /^$out_file$/));
+   die "ERROR: $out_file already exists\n" unless (!(-T $out_file));
+
+   open(in_file) || die "Unable to open $in_file\n";
+   open(out_file,">$out_file") || die "Unable to open $out_file\n";
+
+   print out_file "#===========================================================================\n";
+   print out_file "# The following RNPL was created using '$Pgname $in_file $out_file $option'\n";
+   print out_file "# on $date \n";
+   print out_file "# \n";
+   print out_file "# PLEASE DO NOT MODIFY.\n";
+   print out_file "#===========================================================================\n";
+
+   #===========================================================================
+   # option -s strips all $ signs from the source, restoring the 
+   # 'plain' version
+   #===========================================================================
+   if ($#ARGV==2) 
+   {
+      $_=$option;
+      if (/-s/) 
+      {
+         while(<in_file>)
+         {
+            s/\$//g;
+            print out_file $_;
+         }
+         exit;
+      }
+      else { die $Usage; }
+   }
+
+   #===========================================================================
+   # read in_file into a single string, stripping away comments
+   #===========================================================================
+
+   $input_string="";
+   while(<in_file>)
+   {
+      $input_string .= $_ unless /^#[^%].*/;
+   }
+
+   #===========================================================================
+   # search for the mask directive
+   #===========================================================================
+   
+   $_=$input_string;
+   $no_amr="NO AMR";
+   if (/#%define\s+mask\s*\(\s*(\w+)\s*;\s*(\w+)\s*;\s*(.+?)\s*\)/s)
+   {
+      $mask=$1; $mask_val=$2; $central_offset=$3;
+      $amr_val=$no_amr;
+      $amr_expr="";
+   }
+   elsif (/#%define\s+mask\s*\(\s*(\w+)\s*;\s*(\w+)\s*,\s*(\w+)\s*;\s*(.+?)\s*\)/s)
+   {
+      $mask=$1; $mask_val=$2; $central_offset=$4;
+      $amr_val=$3;
+      $amr_expr="(<0>$mask$central_offset != $amr_val) && ";
+   }
+   else
+   {
+      die "#%define mask() statement required\n";
+   }
+   if ($ltrace) {print "mask=$mask; mask_val=$mask_val, amr_val=$amr_val; central_offset=$central_offset\n";}
+
+   #===========================================================================
+   # decode all masked_op directives
+   #
+   # hash array keys:
+   #
+   # op_names,op_coords,op_nsubs : op_name.op_coord ; eg. D_0z, D_FWrho, ...
+   # sub_index : op_name.op_coord.n (n ranges from 0 to 1-# of substitutions defined for
+   #             operator); eg. D_0z0, D_0z1, ...
+   # sub_new_op : op_name.op_coord.index; eq. D_0z[0][-1], ... 
+   #===========================================================================
+
+   %op_names={};
+   %op_coords={};
+   %sub_index={};
+   %sub_new_op={};
+   %op_nsubs={};
+   $_=$input_string;
+   $n=0;
+   while(/#%define\s+masked_op\s*\(\s*(\w+)\s*;\s*(\w+)\s*;([^\)]*)\)/sg)
+   {
+      $ref=$1.$2;
+      $op_names{$ref}=$1;
+      $op_coords{$ref}=$2;
+      $subs=$3;
+      $ns=0;
+      if ($ltrace) { print "masked operator $op_names{$ref}(,$op_coords{$ref}) : substitutions:\n"; }
+      while($subs =~ /\s*(.+?)->\s*(\w+)\s*[,|\)]?/sg)
+      {
+         $index=$1;
+         $new_op=$2;
+         $index =~ s/[\s|\n|#|%]*//sg;  #strip away whitespace, etc.
+         $ref2=$ref.$ns;
+         $sub_index{$ref2}=$index;
+         $ref3=$ref.$index;
+         $sub_new_op{$ref3}=$new_op;
+         if ($ltrace) {print "\t index:$index, new op:$new_op\n";}
+         $ns++;
+      }
+      $op_nsubs{$ref}=$ns;
+      $n++;
+   }
+ 
+   #===========================================================================
+   # loop through all RNPL residual statements
+   #===========================================================================
+
+   $_=$input_string;
+   while(/(\G.*?)(residual\s+)(\w+)\s*{(.*?)}/sg)
+   {
+      $remaining=$';
+      print out_file "$1$2 $3 {";
+      $var=$3;
+      $statement=$4;
+      if ($ltrace) {print "checking var: $var\n";}
+      $sn=1;
+
+      #========================================================================
+      # loop through all individual update statements in a residual
+      #========================================================================
+      while($statement =~ /(\G.*?)(]\s*:=)([^;]*);/sg)
+      {
+         print out_file "$1$2";
+         if ($ltrace) {print "\t statement $sn:\n"; $sn++;}
+         $ss=$3;
+         @used_ops={};
+         %used_ops_h={};
+         $no=0;
+
+         #=====================================================================
+         # find all $ operators used in the expression
+         #=====================================================================
+         while($ss =~ /\$(\w+)\s*\([^,]+,\s*(\w+)/sg)
+         {
+            $ref=$1.$2;
+            if (defined $op_names{$ref})
+            {
+               if (!(exists $used_ops_h{$ref}))
+               {
+                  $used_ops_h{$ref}="exists";
+                  if ($ltrace) {print "\t\t uses masked op. $1(,$2)\n";}
+                  $used_ops[$no]=$ref;
+                  $used_ops_on[$no]=1;
+                  $no++;
+               }
+            }
+            else 
+            {
+               die "ERROR : undefined masked operator $1(,$2) \n";
+            }
+         }
+
+         #=====================================================================
+         # perform all operator substitutions
+         #=====================================================================
+         if ($no>0)
+         {
+            print out_file "\nif (<0>$mask$central_offset == $mask_val) then <1>$var$central_offset=0\n";
+            &build_c_sub_index;
+            &permute(0); 
+            print out_file ";\n";
+         }
+         else
+         {
+            if ($amr_val!~$no_amr)
+            {
+               #=====================================================================
+               # if there are existing if statements within the RNPL, then
+               # we need to insert the AMR part (as of yet RNPL doesn't
+               # handle nested if statements)
+               #=====================================================================
+               if ($ss=~/\s*if\s*\(/s)
+               {
+                  $ss =~ s/if\s*\(/if \(<0>$mask$central_offset != $amr_val &&/sg;
+                  $ss =~ s/else(?!\s*if\s*\()/else if \(<0>$mask$central_offset != $amr_val) then /sg;
+               }
+               else
+               {
+                  print out_file "\nif (<0>$mask$central_offset != $amr_val) then \n";
+               }
+            }
+            print out_file "$ss;";
+         }
+      }
+      print out_file "\n}";
+   }
+   print out_file "$remaining";
+
+   if ($ltrace) { print "done\n"; }
+}
+
+#============================================================================== 
+# The following subroutine builds a list of the *unique*
+# coordinate indecies for all substitutions in the set
+# of $used_ops[0..$no] operators.
+# Creates the arrays c_sub_index,c_sub_index_on, each with ns entries.
+#============================================================================== 
+sub build_c_sub_index
+{
+   $ns=0;
+   @c_sub_index={};
+   @c_sub_index_on={};
+   my %c_defined_subs={};
+   my ($i,%j);
+
+   for ($i=0; $i<$no; $i++)
+   {
+      $ref=$used_ops[$i];
+      for ($j=0; $j<$op_nsubs{$ref}; $j++)
+      {
+         $ref2=$ref.$j;
+         if (!(exists $c_defined_subs{$sub_index{$ref2}}))
+         {
+            $c_defined_subs{$sub_index{$ref2}}="exists";
+            $c_sub_index[$ns]=$sub_index{$ref2};
+            $c_sub_index_on[$ns]=0;
+            if ($ltrace) {printf "\t\t\t<$c_sub_index[$ns]>\n"}
+            $ns++;
+         }
+      }
+   }
+}
+
+#============================================================================== 
+# 'permute' recursively goes through all combinations of the boolean values of 
+# c_sub_index_on, which controls the appearance of the corresponding index in the 
+# 'if' statements.
+# (n single index which is 'on' implies that mask[index]==mask_val;
+#  and that mask[index]!=maskval if it is 'off'. A multi-index which is on implies
+#  that at least one of it's indecies satisfies mask[index]==mask_val; and
+#  if off implies that *none* of the corresponding mask values equal mask_val.) 
+#============================================================================== 
+sub permute
+{
+   my $i=@_[0];
+   if ($i==$ns)
+   {
+      if (&ambiguous || &inconsistant) {return;}
+      my ($j,$first,$t_ss,$k,$sr_pattern);
+      $first=1;
+      $t_ss = $ss;
+      $t_ss =~ s/\$//sg;
+      print out_file "else if ($amr_expr(";
+      for ($j=0;$j<$ns;$j++)
+      {
+         if ($c_sub_index_on[$j]==0)
+         {
+            my $index = $c_sub_index[$j];
+            $index =~ s/\+/!=$mask_val && <0>$mask/sg;  # expand multi-indecies
+
+            if ($first)
+            {
+               print out_file "  <0>$mask$index!=$mask_val";
+               $first=0;
+            }
+            else
+            {
+               print out_file "\n         &&<0>$mask$index!=$mask_val";
+            }
+         }
+         else
+         {
+            for ($k=0;$k<$no;$k++)
+            {
+               $ref=$used_ops[$k];
+               $ref3=$ref.$c_sub_index[$j];
+               if (exists $sub_new_op{$ref3})
+               {
+                  $t_ss =~ s/$op_names{$ref}(\s*\([^,]+,\s*$op_coords{$ref})/$sub_new_op{$ref3}\1/sg;
+               }
+            }
+         }
+      }
+      if ($first)
+      {
+         print out_file "1==1)) then\n";
+      }
+      else
+      {
+         print out_file ")) then\n";
+      }
+      print out_file "$t_ss\n";
+   }
+   else
+   {
+      $c_sub_index_on[$i]=0;
+      permute($i+1);
+      $c_sub_index_on[$i]=1;
+      permute($i+1);
+   }
+}
+
+#============================================================================== 
+# returns 1 if the current permutation selects more than 1 *different*
+# substitution for the same operator
+#============================================================================== 
+sub ambiguous
+{
+   my ($i,$j);
+
+   for ($i=0;$i<$no;$i++)
+   {
+      my $used=0;
+      my $ssub="";
+      for ($j=0;$j<$ns;$j++)
+      {
+         my $sub=$sub_new_op{$used_ops[$i].$c_sub_index[$j]};
+         if ($c_sub_index_on[$j] && (defined $sub) && ( ($ssub cmp $sub) || !($ssub cmp "")))
+         {
+            $used++;
+            $ssub=$sub;
+         }
+         if ($used==2) {return 1;}
+      }
+   }
+   return 0;
+}
+
+#============================================================================== 
+# returns 1 if the current permutation is inconsistant, which means that
+# there is a multi-index which is off, and some other index which is on yet
+# is a subset of the multi-index.
+#============================================================================== 
+sub inconsistant
+{
+   my ($k,$j);
+
+   for ($j=0;$j<$ns;$j++)
+   {
+      if ($c_sub_index_on[$j])
+      {
+         for ($k=0;$k<$ns;$k++)
+         {
+            if (!$c_sub_index_on[$k] && ($c_sub_index[$k] =~ /\Q$c_sub_index[$j]\E/))
+            {
+               return 1;
+            }
+         }
+      }
+   }
+   return 0;
+}

@@ -1,0 +1,969 @@
+\documentclass[aps,amssymb,unsortedaddress,nofootinbib]{revtex4}
+%\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{psfrag}
+\def\bv{\begin{verbatim}}
+\def\ev{\end{verbatim}}
+\def\lsep{\itemsep 0.05in}
+
+\begin{document}
+\title{AMRD Reference Manual}
+
+\author{Frans Pretorius}
+
+\address{Department of Physics \\
+P-412, Avadh Bhatia Physics Laboratory \\
+University of Alberta \\
+Edmonton, AB, T6G 2J1}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+
+AMRD (adaptive mesh refinement driver) is a library consisting of a
+single function, {\bf amrd()}, which implements a Berger and Oliger (B\&O)
+style adaptive mesh refinement (AMR) driver, with modifications to
+allow one to solve elliptic equations within the B\&O time stepping framework,
+as outlined in \cite{fpthesis}. A standard, adaptive, 
+full approximation storage (FAS) multigrid (MG) algorithm is thus 
+also provided.  The user specifies the particular 
+partial differential equations (PDEs) to solve via a set of ``hook'' functions
+that are called by AMRD at appropriate times. AMRD is built on top of 
+PAMR \cite{pamr}, and so is parallel ready.
+AMRD is still very much under development, as is this document. Comments, questions,
+bug reports (no guarantees that they will be fixed!), etc. should be
+sent to
+\begin{verbatim}
+fransp@phys.ualberta.ca
+\end{verbatim}
+
+The description of AMRD is sub-divided into the following sections. 
+Section \ref{sec_init} describes how to invoke the driver, Section
+\ref{sec_hook} lists all the hook functions, Section \ref{sec_opts}
+lists all the run-time parameters, and Section \ref{sec_example}
+describes a couple of simple example programs included in the distribution. 
+
+At this stage only
+a C-language interface exits, though a fortran interface may be forthcoming.
+The type {\bf real} used throughout the interface is inherited from PAMR, and
+is currently defined as (see {\rm /include/internal\_opts.h})
+\begin{verbatim}
+#define real double
+\end{verbatim}
+{\bf true} and {\bf false} refer to C-style booleans, namely zero for
+{\bf false} and non-zero for {\bf true} (though these are {\em not} 
+types defined in the PAMR headers).
+\par
+Arrays are required to be indexed fortran style, i.e. first index
+varies most rapidly. Also, all array indicies passed to and returned from
+various PAMR functions use fortran style numbering (element 1 is the first 
+element in the array); however example code statements below are in C and
+adjust these numbers to C style indexing.
+
+%%==============================================================================
+
+\section{Initialization}\label{sec_init}
+
+The driver is invoked via a single call:
+
+\begin{verbatim}
+void amrd(int argc, char **argv,
+          int (*app_id)(void),
+          void (*app_var_pre_init)(char *pfile),
+          void (*app_var_post_init)(char *pfile),
+          void (*app_AMRH_var_clear)(void),
+          void (*app_free_data)(void),
+          void (*app_t0_cnst_data)(void),
+          real (*app_evo_residual)(void),
+          real (*app_MG_residual)(void),
+          void (*app_evolve)(int iter),
+          real (*app_MG_relax)(void),
+          void (*app_L_op)(void),
+          void (*app_pre_io_calc)(void),
+          void (*app_scale_tre)(void),
+          void (*app_post_regrid)(void),
+          void (*app_post_tstep)(int L),
+          void (*app_fill_ex_mask)(real *mask, int dim, int *shape, real *bbox, real excised),
+          void (*app_fill_bh_bboxes)(real *bbox, int *num, int max_num));
+\end{verbatim}
+
+The {\bf argc} and {\bf argv} arguments are the standard C command line information
+passed via {\bf main()}. At this stage the only command line argument interpreted by 
+{\bf amrd()} is the name of a parameter file. The call to {\bf amrd()} starts the driver,
+which then reads all the options from the parameter file, initializes the PAMR context,
+and then starts the evolution. At various moments during this process, user {\em hook}
+functions, as specified by the {\bf app\_...}, arguments are called, and are expected
+to perform the actual PDE specific numerics. Hook functions passed in the {\bf amrd()} 
+parameter list that are not needed
+must still be defined, however they can immediately {\bf return}. Since the first
+version of AMRD several new hook functions have been added; they are
+described in Sec.\ref{sec_op_hooks}, and must be defined prior to the call to
+{\bf amrd()} if used.
+All hook functions are described in the following section.
+
+\section{User Hook Functions}\label{sec_hook}
+
+AMRD uses PAMR to manage the grid hierarchy. When calling a hook function
+that is expected to perform numerical operations on grid functions, AMRD initializes
+a sequential iterator in PAMR to loop through all the local grids (see the section
+{\em Grid-function access} in the PAMR reference manual \cite{pamr}), and
+for each grid calls the desired hook function. Therefore, such hook functions
+can access all relevant grid information via the corresponding PAMR functions,
+but should {\em not} use any iterator functions; i.e., the numerical hooks
+only operate on single grids at a time, and do not need to know 
+anything about grid distribution issues.
+In the listings below, hook functions that operate on individual grids
+have a {\em /* grid function hook */} comment.
+
+\subsection{Custom generation of the initial hierarchy}
+
+\begin{verbatim}
+int app_id(void);
+\end{verbatim}
+
+This function is called after all parameters have been read
+and the base level(s) \footnote{if the maximum possible 
+depth of the hierarchy specified via {\bf AMRD\_max\_lev} is greater than 1,
+then 'base' level consists of two fully refined levels due to
+the self-shadow hierarchy method used to compute truncation errors}
+have been allocated.
+If the return is {\bf true}, then the user has created all subsequent
+levels in the hierarchy and appropriately initialized them, 
+and evolution starts immediately. Otherwise, one of AMRD's default
+hierarchy initialization mechanisms is invoked.
+
+\subsection{Reading custom parameters}
+
+\begin{verbatim}
+void app_var_pre_init(char *pfile);
+void app_var_post_init(char *pfile);
+\end{verbatim}
+
+These two hook functions are called before ({\bf app\_var\_pre\_init})
+and after ({\bf app\_var\_post\_init}) AMRD parameters have
+been read from the parameter file {\bf pfile} and the base hierarchy 
+has been initialized. Several utility functions, listed below, 
+are provided to read simple data structures in RNPL format \cite{rnpl} 
+from the parameter file.
+
+\begin{verbatim}
+void AMRD_int_param(char *pfile, char *name, int *var, int size);
+void AMRD_real_param(char *pfile, char *name, real *var, int size);
+void AMRD_str_param(char *pfile, char *name, char **var, int size);
+void AMRD_ivec_param(char *pfile, char *name, int *var, int size);
+\end{verbatim}
+
+In all cases above, {\bf pfile} is the parameter file name,
+{\bf name} is the name of the parameter, {\bf var} is a pointer
+to an array where the result should be stored, and {\bf size}
+refers to the expected size of the array (note that currently
+for integer, real and string arrays, the size must {\em exactly}
+match the size of the object in the parameter file, if it is present). If the desired
+parameter is not in the parameter file, nothing is written to the
+memory locations (so pre-initialize with defaults).
+
+\subsection{Specifying initial data}
+
+\begin{verbatim}
+void app_AMRH_var_clear(void); /* grid function hook */
+void app_free_data(void); /* grid function hook */
+void app_t0_cnst_data(void); /* grid function hook */
+\end{verbatim}
+
+These routines allow one to initialized grid functions in the hierarchy.
+{\bf app\_AMRH\_var\_clear()} is expected to set all variables
+in the AMR hierarchy to their ``zero'' values. {\bf app\_free\_data()}
+is called during the generation of the initial hierarchy, and
+is expected to set the initial conditions for all freely specifiable
+fields at the initial time level (specified via {\bf AMRD\_ic\_n}). 
+{\bf app\_t0\_cnst\_data} is called after every multigrid V-cycle
+when calculating the initial data, and can be used to enforce
+algebraic (or other) constraints amongst initial data fields.
+
+\subsection{Multigrid routines} \label{sec_MG_routines}
+
+\begin{verbatim}
+real app_MG_residual(void); /* grid function hook */
+real app_MG_relax(void); /* grid function hook */
+void app_L_op(void); /* grid function hook */
+\end{verbatim}
+
+These routines are required by the built-in FAS multigrid algorithm (with V-cycling),
+to solve elliptic equations of the form 
+\begin{equation}
+\mathcal{L} [f] = 0,
+\end{equation}
+where $\mathcal{L}$ is a differential operator acting on a variable $f$. The
+FAS algorithm introduces a new right hand side $R_f$ on coarser levels
+of the hierarchy, modifying the above equation to
+\begin{equation}\label{ell2}
+\mathcal{L} [f] = R_f.
+\end{equation}
+{\bf app\_MG\_residual} returns some norm of the residual of the MG variables,
+{\em and} expects the point-wise residual $\mathcal{L} [f]-R_f$ to be stored in the grid function
+{\bf f\_res} for each MG variable {\bf f}. $R_f$ is stored in the variable {\bf f\_rhs}. The function
+{\bf app\_MG\_relax} is expected to perform one smoothing
+(relaxation) sweep of (\ref{ell2}) over the grid, and return an estimate of the norm of the 
+residual on that grid. 
+{\bf app\_L\_op} computes the result of the differential operator
+acting on the each MG variable {\bf f} (i.e. $\mathcal{L} [f]$),
+in a region of the grid specified by the grid function {\bf cmask}---where 
+{\bf cmask[i,j,...]==AMRD\_CMASK\_ON}---and stores the result in {\bf f\_lop}.
+Parts of the grid where {\bf cmask[i,j,...]==AMRD\_CMASK\_OFF} should {\em not}
+be modified by the user routine.
+
+\subsection{Evolution routines}
+
+\begin{verbatim}
+void app_evolve(int iter); /* grid function hook */
+real app_evo_residual(void); /* grid function hook */
+\end{verbatim}
+
+{\bf app\_evolve} is expected to perform 1 iteration of some evolution scheme,
+updating unknowns at the most advanced time level. The argument {\bf iter} 
+tells what the iteration (starting at 1) within the current time step is.
+{\bf app\_evo\_residual} returns some norm of the residual of the evolution
+equations.
+
+\subsection{Excision routines}\label{sec_ex_fncs}
+
+\begin{verbatim}
+void app_fill_ex_mask(real *mask, int dim, int *shape, real *bbox, real excised); 
+void app_fill_bh_bboxes(real *bbox, int *num, int max_num);
+\end{verbatim}
+
+{\bf app\_fill\_ex\_mask} is expected to set all points within excised regions in the
+grid function {\bf mask} to {\bf excised}, and some other value outside of excised regions.
+{\bf NOTE:} this function is {\em not} called within a PAMR sequential iterator environment,
+and could be called at times when the hierarchy is undefined (in between a regrid). Thus
+no PAMR functions should be called during the execution of this hook. To this end,
+the mask grid functions' dimension ({\bf dim}), shape array ({\bf shape}), and coordinate bounding
+box ({\bf bbox}) are passed as arguments.\par
+{\bf app\_fill\_bh\_bboxes} is expected to fill an array of bounding box 
+structures ($[x\_1,x\_2,y\_1,y\_2,...]$),
+each describing the smallest rectangular region containing a given excised region
+in the domain. This is used with the {\bf AMRD\_TRE\_sgpbh} option (see section \ref{sec_rgc_ops} below).
+{\bf bbox} is a preallocated array of memory of size {\bf 2*dim*max\_num}. {\bf max\_num} is
+the maximum number of distinct excised regions that are supported, and upon return {\bf num}
+should be set to the actual number of excised regions.
+
+\begin{verbatim}
+void AMRD_repopulate(int n, int def_order);
+\end{verbatim}
+
+{\bf AMRD\_repopulate} is {\em not} a hook function; rather it is a utility routine
+that can be used to ``repopulate'' grid points if the excision mask moves during
+evolution. When this function is called, {\em all} hyperbolic (at {\em all} times) and elliptic variables,
+over {\em all} levels,
+are extrapolated $\bf n$ grid-points in from the existing excision boundary
+(using {\bf def\_order}-order extrapolation by default,
+but this can be changed on a variable-by-variable basis via the {\bf ex\_repop1\_vars,...}
+excision options---see Sec.\ref{sec_ex_ops}). After the extrapolation, all
+{\bf rg\_diss\_vars} are smoothed if ${\bf rg\_diss\_eps}>0$ (see Sec.\ref{sec_rgc_ops}).
+
+\subsection{Miscellaneous routines}
+
+\begin{verbatim}
+void app_pre_io_calc(void); /* grid function hook */
+void app_scale_tre(void); /* grid function hook */
+void app_post_regrid(void); /* grid function hook */
+void app_post_tstep(int L); 
+\end{verbatim}
+
+{\bf app\_pre\_io\_calc} is called prior to any output of grid functions to
+disk, to allow one to calculate any diagnostic grid functions outside of the
+evolution loop. {\bf app\_scale\_tre} gives the user the option to manipulate
+the standard truncation error (TE) estimates for the
+set of variables for which such estimates are computed. Two global variables
+can be of help in this regard: {\bf AMRD\_num\_f\_tre\_vars} is an integer
+describing the number of TE variables, and {\bf AMRD\_f\_tre} is an array of
+{\bf AMRD\_num\_f\_tre\_vars} pointers to the corresponding grid function data.
+After {\bf app\_scale\_tre} is called, the actual TE estimate used by AMRD
+is calculated as the point-wise $\ell_2$ norm of this set of TE estimate variables.
+{\bf app\_post\_regrid} is called after regridding. 
+{\bf app\_post\_tstep} is called after each evolution
+step has been completed. The level number of the most recent step is passed
+in {\bf L}.
+
+\subsection{Optional hook functions}\label{sec_op_hooks}
+Some hook functions are not specified in the {\bf amrd()} 
+argument list, but can be declared prior to the call to {\bf amrd()} 
+(this is the mechanism that should have been used to declare all hook
+functions, though for ``historic'' reasons only newer hooks are specified
+as such). The function {\bf amrd\_set\_xxx\_hook} is used
+to define the {\bf xxx} hook function.
+
+\begin{verbatim}
+void amrd_set_app_pre_tstep_hook(void (*app_pre_tstep_f)(int L));
+void app_pre_tstep(int L);
+\end{verbatim}
+
+{\bf app\_pre\_tstep} is called prior to taking a time step on level $L$.
+
+\begin{verbatim}
+void amrd_set_app_user_cp_hook(void (*app_pre_tstep_f)(int save_restore, char *data), int cp_data_size);
+void app_user_cp(int save_restore, char *data);
+\end{verbatim}
+
+{\bf app\_user\_cp} is used for check-pointing (see Sec.\ref{sec_cp}). Prior to saving to 
+a check-point file, {\bf app\_user\_cp} is called with {\bf save\_restore} equal to 
+{\bf AMRD\_CP\_SAVE}, and the user program can fill in a block of memory pointed to by {\bf data},
+of size {\bf cp\_data\_size}, with any local state information that cannot be read from
+the parameter file. After restarting from a previously saved check-point file,
+{\bf app\_user\_cp} is called with {\bf save\_restore} equal to
+{\bf AMRD\_CP\_RESTORE}, and {\bf data} will point to a block of memory containing the
+data previously saved.
+
+\section{Options}\label{sec_opts}
+
+The following describe all of AMRD's options, specified in the input
+parameter file. These options include specifying the number and type
+of variables, and controlling various aspects of the AMR/MG algorithms.
+Most of the options are declared as global variables (with an AMRD\_
+prefix that does {\em not} appear in the parameter file names), and
+so can be accessed by the user programs during execution (see the 
+amrd.h header file). 
+
+{\bf NOTE:} RNPL is used to read parameters from the file, and
+currently it cannot handle array parameters of unknown length. Therefore,
+for any such parameter {\bf p} that is in the input file, there is a corresponding
+integer parameter {\bf num\_p}, that must be specified and tells how
+large the array {\bf p} is.
+
+The format of the parameter listings below are as follows:
+
+\begin{list}{}{\lsep}
+\item {\bf name} ({\em type}, default=...):
+\end{list}
+
+Current scalar types include {\em real, integer, string} and {\em ivec}.
+Array types are shown as {\em real[size], integer[size]} and {\em string[size]}.
+The size is either a constant, or as discussed above, a integer size variable
+that must be declared elsewhere in the parameter file.
+Some parameters do not have defaults,
+and are required to be present in the input file.
+
+\subsection{Variable definition}
+
+The following parameters tell AMRD what variables to define over the 
+grid hierarchy. Variable options (such as the kind of interpolation, restriction, etc.)
+are discussed in later sections.
+
+\begin{list}{}{\lsep}
+\item {\bf hyperbolic\_vars} ({\em string[num\_hyperbolic\_vars]}, default=[]):
+      The list of ``hyperbolic'' variables. They are defined in both the
+      AMR (for all {\bf num\_evo\_tl} time levels) and MG hierarchies, but
+      are assumed to play the role of passive ''source'' functions during MG.
+\item {\bf elliptic\_vars} ({\em string[num\_elliptic\_vars]}, default=[]):
+      The list of ``elliptic'' variables. They are defined in both the
+      AMR (for all {\bf num\_evo\_tl} time levels) and MG hierarchies,
+      but are assumed to play the role of passive ''source'' functions during
+      evolution time steps. For each elliptic variable {\bf f} that is
+      defined here, AMRD will create the following list of additional 
+      variables (see Sec. \ref{sec_MG_routines} for a description of
+      the MG variables; the extra AMR variables are used to implement the
+      ``extrapolation and delayed solution'' technique to deal with elliptics
+      in Berger and Oliger AMR, as discussed in \cite{fpthesis}): 
+      {\bf f\_rhs} (in MG hierarchy), {\bf f\_res} (MG), 
+      {\bf f\_lop} (MG), {\bf f\_rhs} (MG), {\bf f\_brs} (AMR, one time level only),
+      {\bf f\_extrap\_tm1} (AMR, one time level only),
+      {\bf f\_extrap\_tm2} (AMR, one time level only).
+\item {\bf elliptic\_vars\_t0} ({\em string[num\_elliptic\_vars\_t0]}, default=[]):
+      The list of ``elliptic'' variables that {\em only} exist at $t=t_0$ for
+      the purposes of initial data calculation. They are only defined in
+      the MG hierarchy.
+\item {\bf AMRH\_work\_vars} ({\em string[num\_AMRH\_work\_vars]}, default=[]):
+      The list of AMR ``work'' variables; i.e. variables that are only defined
+      in the AMR hierarchy at one time level.
+\item {\bf MGH\_work\_vars} ({\em string[num\_MGH\_work\_vars]}, default=[]):
+      The list of MG ``work'' variables; i.e. variables that are only defined
+      in the MG hierarchy.
+\item {\bf TRE\_vars} ({\em string[num\_TRE\_vars]}, default=[]):
+      A subset of the list of {\bf hyperbolic\_vars} that will be used for
+      truncation error estimated. For each variable {\bf f} listed here,
+      a one time level AMR variable {\bf f\_tre} will be created to hold the
+      corresponding variable's truncation error estimate (only calculated prior
+      to regridding).
+\end{list}
+
+
+\subsection{Hierarchy definition}
+
+The following parameters define basic properties of the 
+grid hierarchy.
+
+\begin{list}{}{\lsep}
+\item {\bf dim} ({\em integer}): 
+      The spatial dimension, which currently can be 1,2 or 3.
+\item {\bf num\_evo\_tl} ({\em integer}): 
+      The number of time levels in the AMR hierarchy.
+\item {\bf ic\_n} ({\em integer}, default=2):
+      Which time level is considered $t=t_0$ for initial data calculation.
+\item {\bf base\_shape ({\em integer[dim]}, default=[3,3,...])}:
+      The base grid shape.
+\item {\bf base\_bbox ({\em real[2*dim]}, default=[-1,1,-1,1,...])}:
+      The base grid coordinate bounding box.
+\item {\bf max\_lev} ({\em integer}, default=1):
+      The maximum depth of the AMR hierarchy. {\bf max\_lev=1} is therefore
+      unigrid, and note that because of the ``self-shadow hierarchy'' 
+      technique used to compute truncation error estimates, if {\bf max\_lev$>$1}
+      level 2 is always fully refined, hence the first two levels effectively
+      become the base level in an AMR evolution.
+\item {\bf t0} ({\em real}, default=0.0):
+      The initial time.
+\item {\bf rho\_sp} ({\em integer}, default=2):
+      This variable sets the spatial refinement ratio for all levels in the hierarchy
+      to the {\em same} value {\bf rho\_sp}.
+\item {\bf rho\_tm} ({\em integer}, default=2):
+      This variable sets the temporal refinement ratio for all levels in the hierarchy
+      to the {\em same} value {\bf rho\_tm}.
+\item {\bf rho\_sp\_all} ({\em integer[max\_lev]}, default=[2,...]):
+      {\bf rho\_sp\_all[i-1]} defines the spatial refinement ratio of level {\bf i}
+      (taking precedence over any {\bf rho\_sp} declaration).
+\item {\bf rho\_tm\_all} ({\em integer[max\_lev]}, default=[2,...]):
+      {\bf rho\_tm\_all[i-1]} defines the spatial refinement ratio of level {\bf i}
+      (taking precedence over any {\bf rho\_tm} declaration).
+\item {\bf periodic} ({\em integer[dim]}, default=[0,...]):
+      If set to a number other than 0, the corresponding spatial boundary is considered periodic,
+      and PAMR will take care of properly enforcing periodic boundary conditions.
+\item {\bf lambda} ({\em real}, default=1.0):
+      The local CFL factor; i.e. {\bf dt=lambda*min(dx,dy,...)}.
+\end{list}
+
+\subsection{Parallel options}
+
+\begin{list}{}{\lsep}
+\item {\bf ghost\_width} ({\em integer[dim]}, default=[2,...]):
+      The size of the ghost region to add along interior grid boundaries
+      that are created by PAMR when splitting a grid across several nodes.
+\item {\bf gdm\_grid\_by\_grid} ({\em integer}, default=[0,...]):
+      The grid distribution method. Currently only two options are supported,
+      level-by-level (default) and grid-by-grid ({\bf gdm\_grid\_by\_grid!=0}). 
+      With level-by-level, PAMR will try to split the volume taken up by all 
+      the grids at a given level into $N$ pieces, where $N$ are the number of 
+      nodes partaking in the run. With grid-by-grid, PAMR will try to split 
+      the volume taken up by {\em each} grid into $N$ pieces.
+\item {\bf gdm\_align} ({\em integer}, default=[0,...]):
+      If non-zero then ghost regions are padded so that all local child grid
+      boundaries lie on parent grid-lines.
+\item {\bf gdm\_no\_overlap} ({\em integer}, default=[0,...]):
+      If non-zero, then all overlapping grids in the hierarchy, prior to distribution
+      in a parallel environment, are clipped to remove the overlap (option 
+      not yet implemented in PAMR).
+\item {\bf min\_width} ({\em integer[dim]}, default=[3,...]):
+      The minumum size that a grid could get split into.
+\end{list}
+
+\subsection{AMR/evolution options}\label{sec_amr_ops}
+
+\begin{list}{}{\lsep}
+\item {\bf steps} ({\em integer}, default=1): 
+      The number of coarse level (1) time steps to perform.
+\item {\bf evo\_max\_iter} ({\em integer}, default=50): 
+      The maximum number of iterations per time step.
+\item {\bf evo\_min\_iter} ({\em integer}, default=1):
+      The minimum number of iterations per time step.
+\item {\bf evo\_tol} ({\em real}, default=0.0):
+      The tolerance for the hyperbolic equations during the evolution step; i.e. if the
+      residual returned by the hook function {\bf app\_evolve} is less
+      than or equal to {\bf evo\_tol} the equations are considered solved.
+\item {\bf evo\_ssc} ({\em integer}, default=1):
+      This flag, when non-zero, specifies separate stopping criteria for
+      hyperbolic and elliptic equations on the finest level on an evolution step. 
+      This means that if the hyperbolic residual drops below {\bf evo\_tol}
+      while the elliptic residual is still above {\bf MG\_tol}, then subsequent
+      iterations only call the MG routines, and vice-versa. If {\bf evo\_ssc}=0,
+      then the MG and hyperbolic evolution routines are called until 
+      both residuals drop below their respective tolerances.
+\item {\bf np1\_initial\_guess} ({\em real}, default=0):
+      How the advanced time level $t^{n+1}$ is initialized prior to the evolution step.
+      Current options are 0 and 1.
+      {\bf np1\_initial\_guess}=0 means ``do nothing'', and since time-levels are 
+      cyclically switched from one time step to the next, the advanced time 
+      level will contain data from the most retarded time level of the previous
+      time step. {\bf np1\_initial\_guess}=1 copies the data from $t^n$ to $t^{n+1}$.
+\item {\bf MG\_extrap\_method} ({\em integer}, default=0):
+      (experimental ... leave at the default for now)
+\item {\bf eps\_diss} ({\em real}, default=0):
+      Kreiss-Oliger style dissipation parameter for both {\bf tn\_diss\_vars} and
+      {\bf tnp1\_diss\_vars}.
+\item {\bf tn\_eps\_diss} ({\em real}, default=0):
+      Kreiss-Oliger style dissipation parameter for {\bf tn\_diss\_vars}; overrides
+      the {\bf eps\_diss} if present.
+\item {\bf tnp1\_eps\_diss} ({\em real}, default=0):
+      Kreiss-Oliger style dissipation parameter for {\bf tnp1\_diss\_vars}; overrides
+      the {\bf eps\_diss} if present.
+\item {\bf diss\_bdy} ({\em integer}, default=0):
+      Set to 1 to extend the dissipation stencil all the way to grid boundaries
+      (following \cite{calabrese_et_al} otherwise only interior points are smoothed.
+\item {\bf tnp1\_diss\_vars} ({\em string[num\_tnp1\_diss\_vars]}, default=[]):
+      The list of most-advanced time level ($t^{n+1}$) grid functions to smooth 
+      {\em after} an evolution step has completed.
+\item {\bf tn\_diss\_vars} ({\em string[num\_tn\_diss\_vars]}, default=[]):
+      The list of next-to-most-advanced time level ($t^{n}$) grid functions to smooth 
+      {\em before} an evolution step has begun.
+\item {\bf diss\_all\_past} ({\em integer}, default=0):
+      If non-zero, specifies that all past time levels of variables in 
+      {\bf tn\_diss\_vars} should be smoothed (using {\bf tn\_eps\_diss})
+      prior to the evolution step, not only level $t^n$.
+\item {\bf tnp1\_liipb\_vars} ({\em string[num\_tnp1\_liipb\_vars]}, default=[]):
+\item {\bf tnp1\_liiab\_vars} ({\em string[num\_tnp1\_liiab\_vars]}, default=[]):
+\item {\bf tnp1\_liibb\_vars} ({\em string[num\_tnp1\_liibb\_vars]}, default=[]): \par
+      Experimental ... reinitialize these variables via linear interpolation next to (1 grid point in from) 
+      AMR ({\bf tnp1\_liiab\_vars}), physical ({\bf tnp1\_liipb\_vars}) or both
+      ({\bf tnp1\_liibb\_vars}) boundaries after each iteration of the hyperbolic equations.
+\item {\bf interp\_AMR\_bdy\_vars} ({\em string[num\_interp\_AMR\_bdy\_vars]}, default=[]):
+      Experimental (intended for MG variables) ... initialize these variables at their AMR boundaries,
+      at points that have no parent point, via interpolation from points that do,
+      before the evolution step.
+\item {\bf interp\_AMR\_bdy\_order} ({\em integer}, default=4):
+      The order of interpolation to use for {\bf interp\_AMR\_bdy\_vars}.
+\item {\bf max\_t\_interp\_order} ({\em integer}, default=2): The (maximum) order of temporal
+      interpolation to use to set coarse level, AMR boundary conditions. At this stage only
+      second and third order interpolation is supported, and third order interpolation requires
+      at least 3 time levels.
+\item {\bf re\_interp\_width} ({\em integer}, default=0):
+      If $>0$, then after fine level evolution, but just before the
+      fine-to-coarse level injection step, a region of size {\bf re\_interp\_width}
+      points on the fine level adjacent to AMR boundaries are reinterpolated from the parent (coarse)
+      to child (fine) grids.
+\item {\bf amr\_inject} ({\em string[num\_amr\_inject]}, default=[]):
+      The list of variables to be injected from a fine level to the next
+      coarser levels, as per the B\&O scheme.
+\item {\bf amr\_interp2} ({\em string[num\_interp2]}, default=[]):
+      The list of variables that will have their AMR boundaries set
+      via $2^{nd}$ order interpolation in space and time from
+      the next coarser level, as per the B\&O scheme.
+\item {\bf amr\_interp4} ({\em string[num\_interp4]}, default=[]):
+      The list of variables that will have their AMR boundaries set
+      via $4^{th}$ order interpolation in space and $2^{nd}$ order interpolation in time 
+      from the next coarser level, as per the B\&O scheme.
+\item {\bf amr\_sync} ({\em string[num\_sync]}, default=[]):
+      The list of variables that need to have their ghost regions synchronized
+      after each iteration of the evolution equations.
+\item {\bf amr\_transfer2} ({\em string[num\_transfer2]}, default=[]):
+      The list of variables that will be initialized on a new patch of
+      fine level after a regrid, either by copying data from an existing
+      overlapping patch on the same level, or by $2^{nd}$ order 
+      spatial and temporal interpolation from the next coarser level. 
+\item {\bf amr\_transfer4} ({\em string[num\_transfer4]}, default=[]):
+      The list of variables that will be initialized on a new patch of
+      fine level after a regrid, either by copying data from an existing
+      overlapping patch on the same level, or by $4^{th}$ order spatial
+      and $2^{nd}$ order temporal interpolation from the next coarser level.
+\end{list}
+
+The following options define lists of variables that have even or odd character
+across a given physical boundary. At this stage these flags are only utilized
+when applying dissipation.
+
+\begin{list}{}{\lsep}
+\item {\bf even\_vars\_x0min} ({\em string[num\_even\_vars\_x0min]}, default=[]):
+\item {\bf even\_vars\_x0max} ({\em string[num\_even\_vars\_x0max]}, default=[]):
+\item {\bf even\_vars\_x1min} ({\em string[num\_even\_vars\_x1min]}, default=[]):
+\item {\bf even\_vars\_x1max} ({\em string[num\_even\_vars\_x1max]}, default=[]):
+\item {\bf even\_vars\_x2min} ({\em string[num\_even\_vars\_x2min]}, default=[]):
+\item {\bf even\_vars\_x2max} ({\em string[num\_even\_vars\_x2max]}, default=[]):
+\item {\bf odd\_vars\_x0min} ({\em string[num\_odd\_vars\_x0min]}, default=[]):
+\item {\bf odd\_vars\_x0max} ({\em string[num\_odd\_vars\_x0max]}, default=[]):
+\item {\bf odd\_vars\_x1min} ({\em string[num\_odd\_vars\_x1min]}, default=[]):
+\item {\bf odd\_vars\_x1max} ({\em string[num\_odd\_vars\_x1max]}, default=[]):
+\item {\bf odd\_vars\_x2min} ({\em string[num\_odd\_vars\_x2min]}, default=[]):
+\item {\bf odd\_vars\_x2max} ({\em string[num\_odd\_vars\_x2max]}, default=[]):
+\end{list}
+
+
+\subsection{MG options}
+
+\begin{list}{}{\lsep}
+\item {\bf min\_mg\_cwidth} ({\em integer[dim]}, default=[3,...]):
+      The minimum grid size for the coarsest level in the MG hierarchy (independent
+      of parallelization issues).
+\item {\bf MG\_max\_iter} ({\em integer}, default=50):
+      The maximum number of vcycles to perform.
+\item {\bf MG\_min\_iter} ({\em integer}, default=1):
+      The minimum number of vcycles to perform.
+\item {\bf MG\_pre\_swp} ({\em integer}, default=3):
+      The number of pre CGC (coarse-grid-correction) smoothing sweeps to perform.
+\item {\bf MG\_pst\_swp} ({\em integer}, default=3):
+      The number of post CGC smoothing sweeps to perform.
+\item {\bf MG\_tol} ({\em real}, default=0.0):
+      The tolerance for the MG equations  i.e. if the residual returned by 
+      the hook function {\bf app\_MG\_residual}
+      is less than or equal to {\bf MG\_tol} the equations are considered solved.
+\item {\bf MG\_crtol} ({\em real}, default=1.0e-3):
+      Currently AMRD ``solves'' the coarsest grid equations using relaxation.
+      The parameter {\bf MG\_crtol} specifies how much the residual on the coarsest
+      level should be reduced by {\em relative} to the current next-to-coarsest
+      residual, for the coarse grid problem to be considered solved.
+\item {\bf MG\_w0} ({\em real}, default=1.0):
+      An ``under-relaxation'' parameter. The residuals driving the RHS's of the
+      coarser grid differential operators are multiplied by {\bf MG\_w0}, and
+      correspondingly the coarse grid corrections are multiplied by {\bf 1/MG\_w0}
+      before being applied to the finer level. A value of {\bf MG\_w0} on the
+      order of $0.9$ to $0.95$ is useful for certain PDEs.
+\item {\bf MG\_eps\_c} ({\em real}, default=1.0): A ``correction'' to apply
+      to the extrapolation of MG variables on the coarser levels during
+      a constrained evolution---see Section 2.70 of \cite{fpthesis}.
+\item {\bf mg\_interp2} ({\em string[num\_mg\_interp2]}, default=[]):
+      The list of variables that will have linearly interpolated
+      coarse grid corrections applied during the vcycle.
+\item {\bf mg\_hw\_restr} ({\em string[num\_mg\_hw\_restr]}, default=[]):
+      The list of variables that will be restricted to coarser levels
+      in the MG hierarchy via half-weight restriction.
+\item {\bf mg\_fw\_restr} ({\em string[num\_mg\_fw\_restr]}, default=[]):
+      The list of variables that will be restricted to coarser levels
+      in the MG hierarchy via full-weight restriction.
+\item {\bf mg\_sync} ({\em string[num\_mg\_sync]}, default=[]):
+      The list of variables that need to have their ghost regions synchronized
+      after each smoothing sweep.
+\end{list}
+
+\subsection{Initial data/hierarchy options}
+
+\begin{list}{}{\lsep}
+\item {\bf id\_method} ({\em integer}, default=0):
+      The method used to generate the initial hierarchy. Current options
+      are 
+      \begin{list}{}{\lsep}
+      \item {\bf 0}: use truncation error estimates of {\bf TRE\_vars} variables,
+            calculated by taking a set of single coarse-step evolutions;
+      \item {\bf 1}: use a truncation error estimate of the elliptic
+            equations from the initial MG solve.
+      \end{list}
+\item {\bf id\_pl\_method} ({\em integer}, default=0):
+      The method used to initialize past time levels. Current options
+      are 
+      \begin{list}{}{\lsep}
+      \item {\bf 0}: first order extrapolation (i.e. straight copy);
+      \item {\bf 1}: first order extrapolation, then evolve the entire hierarchy
+            backwards, then forwards one coarse step via the B\&O time-stepping
+            scheme;
+      \item {\bf 2}: evolve all levels of the hierarchy backwards in time 
+             by {\bf id\_pl\_steps} ``small'' steps (as specified by a time step
+            {\bf id\_pl\_lambda*dx\_f}, where {\bf dx\_f} is the smallest mesh spacing
+            in the hierarchy), and then extrapolate/interpolate the solution to the initial
+            retarded time levels.
+      \item {\bf 3}: no nothing (or user will do it somewhere else, such
+            as via {\bf app\_t0\_cnst\_data}).
+            Do {\em not} use this option with constrained evolution, as the past
+            data needed to extrapolate the MG variables will not be initialized.
+      \end{list}
+\item {\bf id\_pl\_steps} ({\em integer}, default=1): see {\bf id\_pl\_method}
+\item {\bf id\_pl\_lambda} ({\em real}, default=0.1): see {\bf id\_pl\_method}
+\item {\bf MG\_cnst\_data\_vars} ({\em string[num\_MG\_cnst\_data\_vars]}, default=[]):
+      The list of variables that will be set via {\bf app\_t0\_cnst\_data} following
+      each vcycle.
+\item {\bf MG\_cnst\_data\_vars} ({\em string[num\_MG\_cnst\_data\_vars]}, default=[]):
+\item
+\item {\bf init\_depth} ({\em integer}, default=2, maximum=10):
+\item {\bf init\_bbox\_\#} ({\em real[2*dim]}): 
+\item {\bf init\_bbox\_b\_\#} ({\em real[2*dim]}): 
+   \begin{list}{}{\lsep}
+      \item
+      {\bf \#} is a number between 3 and {\bf init\_depth}.
+      If {\bf init\_depth} is greater than 2, then an initial guess to the grid structure of 
+      levels $3..{\bf init\_depth}$ can be specified via bounding boxes {\bf init\_bbox\_\#} (required) and
+      {\bf init\_bbox\_b\_\#} (optional). Thus, at present two initial grids per level can be
+      specified. Note that it is the users responsibility to make sure that the bounding
+      boxes ``fit'' into the hierarhcy; i.e., no bounds checking, nor grid alignment is performed.
+      Also, depending on the initial hierarchy construction options, the specified structure
+      may not be the one that is actually used for the initial hierarchy (you can freeze this
+      initial hierarchy in by using the {\bf regrid\_min\_lev} option, setting it to {\bf init\_depth}).
+   \end{list}
+\end{list}
+
+\subsection{Regridding/clustering options}\label{sec_rgc_ops}
+
+\begin{list}{}{\lsep}
+\item {\bf TRE\_max} ({\em real}, default=0.0): The maximum estimated truncation
+      error. The truncation error at each point is calculated as the $\ell_2$ norm 
+      of the estimated trunction errors of all the variables specified in {\bf TRE\_vars}.
+      This is then used, modulo buffers, to determine the set of grids in the
+      hierarchy.
+      The estimated truncation error of a given variable is calculated
+      using the self-shadow hierarchy technique, as described in \cite{fpthesis}.
+\item {\bf TRE\_norm} ({\em integer}, default=0): If non-zero, then the 
+      TE estimate of each variable is divided by an approximate $\ell_2$ norm
+      of the magnitude of the corresponding variable.
+\item {\bf TRE\_buffer} ({\em integer}, default=0): The number of buffer cells
+      (relative to the parent level) to add to the region of high TE.
+\item {\bf TRE\_ibc\_buffer} ({\em integer}, default=0):
+      The number of buffer cells adjacent to AMR boundaries in which to
+      clear (zero) the TE estimate.
+\item {\bf TRE\_ibcp\_buffer} ({\em integer}, default=0):
+      Experimental ... the same as {\bf TRE\_ibc\_buffer}, except the calculation is
+      performed {\em locally}; i.e. {\bf TRE\_ibcp\_buffer} clears the
+      TRE adjacent to parallel interior boundaries in addition to AMR boundaries,
+      and hence the result could depend rather strongly on the number of nodes
+      and grid distribution.
+\item {\bf TRE\_exc\_buffer} ({\em integer}, default=0):
+      The number of buffer cells around excised regions in which to
+      clear (zero) the TE estimate, on levels greater than or equal to
+      {\bf TRE\_exc\_buffer\_lmin}
+\item {\bf TRE\_exc\_buffer\_lmin} ({\em integer}, default=0): see above
+\item {\bf regrid\_interval} ({\em integer}, default=4): How often, in steps,
+      to regrid on each level.
+\item {\bf regrid\_min\_lev} ({\em integer}, default=2): The minimum level beyond which
+      regridding can occur (in other words, levels {\bf 1..regrid\_min\_lev} are
+      fixed in time).
+\item {\bf cls\_method} ({\em integer}, default=0): Clustering method. Currently
+      the only method offered is to cover regions of high TE with minimal
+      rectangles.
+\item {\bf cls\_merge\_dist} ({\em integer}, default=0): If clusters are 
+      within {\bf cls\_merge\_dist} grid points of one another, then
+      merge them into a single encompassing cluster.
+\item {\bf cls\_align\_mode} ({\em integer}, default=0): MG imposes restrictions
+      on child grid alignment; if {\bf cls\_align\_mode=0(1)} clusters are shrunk (expanded),
+      if necessary, to conform to MG's requirements.
+\item {\bf TRE\_sgpbh} ({\em integer}, default=0): If non-zero specifies a single
+      grid (before parallel distribution) per black hole when excising.
+\item {\bf skip\_frg} ({\em integer}, default=1): If non-zero then skips the first regrid.
+\item {\bf rg\_diss\_vars} ({\em string[num\_rg\_diss\_vars]}, default=[]):
+      A list of variables to apply standard Kreiss-Oliger dissipation to after regridding.
+\item {\bf rg\_eps\_diss} ({\em real}, default=0.0):
+      The amount of dissipation to apply to {\bf rg\_diss\_vars} variables.
+\item {\bf regrid\_script} ({\em integer}, default=0): The grid hierarchy can 
+      be recorded ({\bf regrid\_script=2}) to an ASCII file during evolution, 
+      or read ({\bf regrid\_script=1}) from such a file to by-pass the TE-based 
+      hierarchy mechanism. This allows one to (for instance) do a ``standard'' convergence test.
+      {\bf NOTE:} when reading the hierarchy structure from a script, {\em no} checking
+      is done to ensure that the grids are consistent with MG, are properly nested, etc.
+      So modify such scripts at your own risk!
+\item {\bf regrid\_script\_name} ({\em string}, default=[]):
+      The file name to read or write a regrid script, if {\bf regrid\_script!=0}.
+\end{list}
+
+\subsection{Excision options}\label{sec_ex_ops}
+
+\begin{list}{}{\lsep}
+\item {\bf do\_ex} ({\em integer}, default=0): If $>0$, then turn on PAMR's excision
+      support functions. Furthermore, a variable called ``chr'' will be defined
+      to store the excision characteristic mask, where a point is excised 
+      if the corresponding value in chr is set to {\bf ex} below.
+      {\em special value: if {\bf do\_ex}$<0$, then excision is turned
+      on, and ``chr'' will be used as the ``eps'' array with dissipation}
+\item {\bf ex} ({\em real}, default=1.0):
+\item {\bf ex\_repop\#\_vars} ({\em string[num\_ex\_repop1\_vars]}, default=[]):
+      During a call to {\bf AMRD\_repopulate}, the list of variables
+      that will be extrapolated using {\bf \#}-order extrapolation (currently
+      {\bf \#} can be between 1 and 4), over-riding the {\bf def\_order} parameter
+      of {\bf AMRD\_repopulate} (see Sec.\ref{sec_ex_fncs}).
+\end{list}
+
+\subsection{Output options}
+
+\begin{list}{}{\lsep}
+\item {\bf save\_tag} ({\em string}, default=[]): A character string to attach
+      to front all output variable file names.
+\item {\bf save\_ivec} ({\em ivec}, default=[]): An index vector specifying
+      the set of coarse grid times to save the desired grid functions on
+      {\em all} levels of the hierarchy to disk (in the current directory).
+\item {\bf save\_mg\_vars} ({\em string[num\_save\_mg\_vars]}, default=[]):
+      The list of MG variables to save.
+\item {\bf save\_\#\_vars} ({\em string[num\_save\_\#\_vars]}, default=[]):
+      The list of AMR variables to save, where the {\bf \#} refers
+      to the time level number. Note that for a 2 or more time level scheme,
+      grid functions are saved to disk when time level 2 is the most advanced
+      time (specifically ,the time sequence is 2,3,4,...,{bf num\_evo\_tl},1).
+\item {\bf save\_ivec\_\#} ({\em ivec}, default=[]): Index vectors specifying
+      the set of times to save level {\bf \#} grid functions to disk.
+\end{list}
+
+\subsection{Check-pointing}\label{sec_cp}
+
+The following flags control PAMR/ARMD's checkpointing mechanism:
+\begin{list}{}{\lsep}
+\item {\bf cp\_save\_fname} ({\em string}, default=``''): A file name tag for saving new check-point files.
+\item {\bf cp\_restore\_fname} ({\em string}, default=``''): A file name tag for restoring the state from an existing
+      set of check-point files.
+\item {\bf cp\_restart} ({\em boolean}, default={\bf false}): If {\bf true}, then 
+      evolution is continued from a prior set of check-point files, with tag {\bf cp\_restore\_fname}.
+      The number of nodes in the new run does not need to be the same as the run that created the check-point data.
+\item {\bf cp\_first\_delta\_t\_hrs}, ({\em integer}, default=0): If greater than zero, the approximate
+      amount of run-time to ellapse before the first check-point.
+\item {\bf cp\_delta\_t\_hrs}, ({\em integer}, default=0): If greater than zero, the approximate
+      amount of run-time between check-points (except possibly the first one, with can be set 
+      with {\bf cp\_first\_delta\_t\_hrs} above).
+\end{list}
+When check-pointing
+during an {\bf n} node parallel run, the internal state of the entire hierarchy
+is saved to a set of files {\it cp\_save\_fname\_X\_\#.sdf, cp\_save\_fname\_AMRD\_X\_\#.sdf},
+where {\it X $\in A..Z,a..z$} is a letter labelling the particular check-point, and
+{\it \# $\in0..(n-1)$} is the rank of the node. {\it X} starts at $A$, and
+after each checkpoint is ``incremented''. After $Z$, the label changes to $a$, and after $z$
+the label resets to $A$. {\bf Thus, at present, a maximum of $52$ unique check-point files can
+be written per run, and after the label wraps around old check-point files will be
+over-written.}
+
+When restarting a run, many of the parameters are retrieved from the parameter file.
+Care should be taken when changing parameters upon a restart. For example, it is
+``safe'' to change dissipation parameters, truncation error estimate thresholds,
+the maximum depth of the hierarchy (the change will only take effect after
+the next regrid), the list of output variables, and similar parameters. Others,
+such as the grid resolution, the CFL factor (if during an AMR evolution with
+more than one time level and the temporal refinement ratio is greater than 1),
+etc., should not be altered (the changes will either be
+ignored, or could have unpredictable effects). 
+
+Internal user parameters can be saved/restored using the {\bf app\_user\_cp} hook;
+see Sec.\ref{sec_op_hooks}.
+
+\subsection{Miscellaneous options}
+
+The {\bf ...\_DV\_trace} options below will eventually allow one to 
+save variables at intermediate points in an iteration for debugging purposes,
+though at this stage these options are not fully supported yet.
+
+\begin{list}{}{\lsep}
+\item {\bf echo\_params} ({\em integer}, default=1): If non-zero, then all
+      parameters are echoed to the screen at run time, in addition to the
+      list of PAMR variables that have been defined.
+\item {\bf pamr\_trace\_lev} ({\em integer}, default=0): see the PAMR reference
+      manual \cite{pamr}
+\item {\bf MG\_trace} ({\em integer}, default=0): 
+\item {\bf MG\_DV\_trace} ({\em integer}, default=-1):
+\item {\bf MG\_DV\_trace\_t\_on} {\em real}, default=1.0e-15):
+\item {\bf MG\_DV\_trace\_t\_off} {\em real}, default=1.0e-15):
+\item {\bf ID\_DV\_trace} ({\em integer}, default=0):
+\item {\bf evo\_DV\_trace} ({\em integer}, default=0):
+\item {\bf evo\_DV\_trace\_t\_on} {\em real}, default=1.0e-15):
+\item {\bf evo\_DV\_trace\_t\_off} {\em real}, default=1.0e-15):
+\item {\bf evo\_trace} ({\em integer}, default=0): Set from 0...3 
+      to have the program output less...more information on the
+      iteration during each evolution step.
+\item {\bf calc\_global\_var\_norms} ({\em integer}, default=0): {\em descriptions to follow}
+\item {\bf calc\_global\_var\_norm\_type} ({\em integer}, default=1):
+\item {\bf calc\_global\_var\_norm\_floor} ({\em real}, default=1.0):
+\end{list}
+
+\section{Examples}\label{sec_example}
+This section describes the two example programs {\bf wave} and {\bf nbs} included in the distribution.
+
+\subsection{wave}
+{\bf wave} is located in the directory
+\begin{verbatim}
+.../pamr/examples/wave/
+\end{verbatim}
+This program solves a 1,2 or 3D flat space wave equation $\Box \Phi = 0$ in a rectangular domain,
+with either Dirichlet or period boundary conditions. A 3 time-level, second
+order accurate leap frog style discretization scheme is used. The following subsections
+describe the parameter and code files in a bit more detail, though I think the best
+way to understand how things work is to peruse the source files (which are 
+relatively simple in this case).
+
+\subsubsection{Parameter Files}\label{sec_wave_param}
+For conceptual clarity, the input parameters are split into two files, the fixed parameters
+in 
+\begin{verbatim}
+.../pamr/examples/wave/wave.fparam
+\end{verbatim}
+and the run-time dependent parameters (the ellipsis ... in the above path name denote
+the directory where pamr was installed). Three run-time parameter files, for
+a 1, 2 and 3d sample, are included in
+\begin{verbatim}
+.../pamr/examples/wave/run_1d/wave.rtparam
+.../pamr/examples/wave/run_2d/wave.rtparam
+.../pamr/examples/wave/run_3d/wave.rtparam
+\end{verbatim}
+The fixed parameter file defines parameters that should be the 
+same for all evolutions. This includes the number of time levels, the variable
+definition (which in this case is the single scalar field variable {\bf phi}),
+interpolation, injection and synchronization options. The run-time parameter
+file defines parameters that could change from run to run, such as the
+number of time steps, scalar field initial data, regridding intervals, etc.
+AMRD expects a single parameter file, thus to run a simulation a sequence
+of commands such as the following could be used:
+\begin{verbatim}
+> cd .../pamr/examples/wave/run_1d/
+> cat ../wave.fparam wave.rtparam > wave.param
+> mpirun -np 2 ../wave wave.param
+\end{verbatim}
+
+\subsubsection{Source Files}\label{sec_wave_source}
+The source is split into two main files plus a header file:
+\begin{verbatim}
+.../pamr/examples/wave/wave.c
+.../pamr/examples/wave/wave.h
+.../pamr/examples/wave/sf_evo.f
+\end{verbatim}
+{\bf wave.c} is the main program, which calls {\bf amrd()} and contains
+all the required hook functions. Note the usage of the PAMR library
+functions, in particular in the function {\bf ldptr()}, which is called
+for all grid based hook functions and queries the library about information
+pertaining to the current grid. The actual numerics are performed in the
+fortran file {\bf sf\_evo.f}---see the comments in the file for more details.
+
+\subsection{nbs}
+{\bf nbs} is located in the directory
+\begin{verbatim}
+.../pamr/examples/nbs/
+\end{verbatim}
+This program solves the Schroedinger equation with Newtonian potential
+in 3D flat space (and can in principle be used to solve for Newtonian boson
+stars, hence the name; however, neither the initial nor boundary conditions
+are setup for doing so at this stage). 
+\begin{eqnarray}
+i \frac{\partial \Phi}{\partial t} &=& -\frac{1}{2} \nabla^2 \Phi + V \Phi \\
+\nabla^2 V &=& \Phi\bar{\Phi},
+\end{eqnarray}
+where $\Phi$ is a complex field (with $\bar{\Phi}$ its complex conjugate) and
+$V$ is a real potential. Dirichlet boundary conditions are used for both
+$\Phi$ and $V$. In the code $\Phi$ is represented by its real and imaginary
+components $\Phi \equiv \Phi_r + i \Phi_i$.
+
+The above is a coupled elliptic-parabolic system of equations, however in the
+code the parabolic Schroedinger equation is treated as a hyperbolic equation
+(solved using a two step Crank-Nicholson like scheme). This imposes a rather
+restrictive CFL condition on the time step, and requires that the temporal refinement ratio be 
+greater than the spatial one. Thus the code is not very useful for doing
+physics, however the purpose of this example is to demonstrate how 
+to solve coupled elliptic/hyperbolic systems with AMRD. 
+
+\subsubsection{Parameter Files}
+As with {\bf wave} (see Sec.\ref{sec_wave_param}), 
+the input parameters are split into two files, the fixed parameters
+in 
+\begin{verbatim}
+.../pamr/examples/nbs/nbs.fparam
+\end{verbatim}
+and the run-time dependent parameters
+\begin{verbatim}
+.../pamr/examples/nbs/run/nbs.rtparam
+\end{verbatim}
+{\bf nbs} is run in the same way as {\bf wave}:
+\begin{verbatim}
+> cd .../pamr/examples/nbs/run/
+> cat ../nbs.fparam nbs.rtparam > nbs.param
+> mpirun -np 2 ../nbs nbs.param
+\end{verbatim}
+
+\subsubsection{Source Files}
+The source is split into two main files plus a couple of include files:
+\begin{verbatim}
+.../pamr/examples/nbs/nbs.c
+.../pamr/examples/nbs/nbs.h
+.../pamr/examples/nbs/num.f
+.../pamr/examples/nbs/cmask.inc
+\end{verbatim}
+The structure of the code is very similar to that of {\bf wave} (see Sec.\ref{sec_wave_source});
+{\bf nbs.c} is the main program interfacing to the libraries,
+and {\bf num.f} contains the numerical routines.
+
+\begin{thebibliography}{1}
+\bibitem{fpthesis} F. Pretorius,
+ ``Numerical Simulations of Gravitational Collapse'',
+ {\em Univ. of British Columbia Ph.D. Thesis} (2002)
+\bibitem{rnpl} R.L. Marsa and M.W. Choptuik,
+ ``The RNPL User's Guide'',\\
+ {http://laplace.physics.ubc.ca/Members/marsa/rnpl/users\_guide/users\_guide.html}
+ (1995)
+\bibitem{pamr} F. Pretorius,
+ ``PAMR Reference Manual'', (2004).
+\bibitem{calabrese_et_al} G. Calabrese, L. Lehner, O. Reula, O. Sarbach, M. Tiglio
+   ``Summation by parts and dissipation for domains with excised regions'',
+      gr-qc/0308007
+\end{thebibliography}
+\end{document}

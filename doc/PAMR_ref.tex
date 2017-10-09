@@ -1,0 +1,1076 @@
+\documentclass[aps,amssymb,unsortedaddress,nofootinbib]{revtex4}
+%\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{psfrag}
+\def\bv{\begin{verbatim}}
+\def\ev{\end{verbatim}}
+\def\lsep{\itemsep 0.05in}
+
+\begin{document}
+\title{PAMR Reference Manual}
+
+\author{Frans Pretorius}
+
+\address{Department of Physics \\
+P-412, Avadh Bhatia Physics Laboratory \\
+University of Alberta \\
+Edmonton, AB, T6G 2J1}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+
+PAMR (parallel adaptive mesh refinement) is a library of routines
+designed to manage {\em distributed grid hierarchies}, in particular,
+those arising from finite difference solutions of systems of partial
+differential equations via adaptive mesh refinement. PAMR is still
+very much under development, as is this document. Comments, questions,
+bug reports (no guarantees that they will be fixed!), etc. should be
+sent to
+\begin{verbatim}
+fransp@phys.ualberta.ca
+\end{verbatim}
+The following sections (rather tersely) describe all the current functions
+and parameters offered by the library routines. At this stage only
+a C-language interface exits, though a fortran interface is in the works.
+The type {\bf real} used throughout the interface is currently defined 
+via (see {\rm /include/internal\_opts.h})
+\begin{verbatim}
+#define real double
+\end{verbatim}
+{\bf true} and {\bf false} refer to C-style booleans, namely zero for
+{\bf false} and non-zero for {\bf true} (though these are {\em not} 
+types defined in the PAMR headers).
+\par
+Arrays are required to be indexed fortran style, i.e. first index
+varies most rapidly. Also, all array indicies passed to and returned from
+various PAMR functions use fortran style numbering (element 1 is the first 
+element in the array); however example code statements below are in C, 
+and so adjust these numbers to C style.
+
+%%==============================================================================
+
+\section{Initialization and clean-up}
+A {\em context} refers to all internal data structures associated with a given
+distributed grid hierarchy. In the future support may be added for the use
+of multiple contexts, and transferring data between different contexts. However,
+a single context is sufficiently general to describe the kinds of grid 
+hierarchies needed to solve coupled elliptic/hyperbolic PDEs using interwoven
+AMR and multigrid hierarchies, using (for instance) the algorithm described in \cite{fpthesis}.
+The following initialization function must be called before any variables or
+grids can be defined:
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_init_context(real *q, int q_size, int dim, 
+                      int *shape, real *bbox, char *cp_file, int cp_rank);
+\end{verbatim}
+
+\begin{list}{}{\lsep}
+\item {\bf return value:} context number ($>0$), or $0$ if an error occurred. 
+\item {\bf q,q\_size:} {\em not yet implemented} 
+\item {\bf dim:} spatial dimension of grids in hierarchy ($1$, $2$ or $3$ currently supported) 
+\item {\bf *shape:} a vector of size {\bf dim} describing the array size of the base grid in the hierarchy 
+\item {\bf *bbox:} a vector of size {\bf dim} describing the coordinate bounding box $[x_1,x_2,y_1,y_2,...]$ of the base grid
+\item {\bf cp\_file:} if a non-empty string is passed, then this
+specifies previously saved check-point files (via {\em PAMR\_cp()})
+to restore the
+grid hierarchy from (thus ignoring the {\bf dim}, {\bf shape} and
+{\bf bbox} parameters). If {\bf cp\_rank} below is $-1$, then
+a set of files {\em cp\_file.sdf, cp\_file\_0.sdf, ..., cp\_file\_n.sdf} 
+is expected that contain
+the saved grid hierarchy from a previous run on $n+1$ nodes. Note
+that {\em every} node in the current run must have access to all
+these files, however the number of processes in the new run does {\em not}
+need to be $n+1$.
+\item {\bf cp\_rank:} used in conjuction with {\bf cp\_file}, though
+currently {\bf cp\_rank}$=-1$ is the only supported option.
+\end{list}
+
+\noindent 
+The following function frees all resources associated with context {\em num}:
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_free_context(int num);
+\end{verbatim}
+
+%%==============================================================================
+
+\section{Variable definition}
+The following functions allow one to define and query the set of variables (grid functions)
+that will comprise the hierarchy.
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_def_var_full(char *name, int in_amrh, int in_mgh, int num_tl, int amr_inject,
+                      int amr_interp, int amr_bdy_interp, int amr_sync, int mg_inject, 
+                      int mg_interp, int mg_sync, int mg_noinj_to_amr, int regrid_transfer, 
+                      int *phys_bdy_type);
+\end{verbatim}
+
+\begin{list}{}{\lsep}
+\item {\bf return value:} the starting grid function number {\bf sgfn} of the variable. 
+          A grid function number (GFN) is
+          an index, starting at 1, into an array of pointers to actual grid function
+          data, as returned by {\em PAMR\_get\_g\_gfs()}, for instance. 
+          Time levels $[1,2,...,\bf{num\_tl}]$ (1 being the most advanced) of grid function
+          data in the AMR hierarchy are mapped to {GFN}'s 
+          $[{\bf sgfn},{\bf sgfn}+1,...,{\bf sgfn}+{\bf num\_tl}-1]$
+          respectively. If {\bf in\_mgh} is {\bf true}, the grid function data in the
+          multigrid (MG) hierarchy is mapped to GFN ${\bf sgfn}+{\bf num\_tl}$.
+
+\item {\bf name:} the variable's unique name 
+
+\item {\bf in\_amrh:} whether this variable exists in the AMR hierarchy ({\bf true} or {\bf false}) 
+
+\item {\bf in\_mgh:} whether this variable exists in the MG hierarchy ({\bf true} or {\bf false}) 
+
+\item {\bf num\_tl:} if ({\bf in\_amrh}), the number of time levels associated with this variable 
+
+\item {\bf amr\_inject:} if ({\bf in\_amrh}), the kind of fine to coarse level injection to be performed
+          in the AMR hierarchy.
+          See Table~\ref{tab_inj_ops} for the current options. 
+
+\item {\bf amr\_interp:} if ({\bf in\_amrh}), the kind of coarse to fine level interpolation to be performed
+          in the AMR hierarchy.
+          See Table~\ref{tab_interp_ops} for the current options. 
+
+\item {\bf amr\_bdy\_interp:} if ({\bf in\_amrh}), the kind of coarse to fine level interpolation to be performed
+          on AMR boundaries. See Table~\ref{tab_interp_ops} for the current options. 
+
+\item {\bf amr\_sync:} if ({\bf in\_amrh}), whether this grid function's ghost regions should be 
+          synchronized in the AMR hierarchy.
+          See Table~\ref{tab_sync_ops} for the current options. 
+
+\item {\bf mg\_inject:} if ({\bf in\_mgh}), the kind of fine to coarse level injection to be performed in the MG
+          hierarchy. See Table~\ref{tab_inj_ops} for the current options. 
+
+\item {\bf mg\_interp:} if ({\bf in\_mgh}), the kind of coarse to fine level interpolation to be performed
+          in the MG hierarchy.
+          See Table~\ref{tab_interp_ops} for the current options. 
+
+\item {\bf mg\_sync:} if ({\bf in\_mgh}), whether this grid function's ghost regions should be 
+          synchronized in the MG hierarchy.
+          See Table~\ref{tab_sync_ops} for the current options. 
+
+\item {\bf mg\_noinj\_to\_amr:} if ({\bf in\_mgh} and {\bf in\_amrg}), this option (when {\bf true})
+          disables injection from a coarse level to a fine level in the MG hierarchy {\em if} the fine
+          level also exists in the AMR hierarchy (as levels that exist in both hierarchies
+          share grid function memory). 
+
+\item {\bf regrid\_transfer:} if ({\bf in\_amrh}), the kind of transfer operation to perform during
+          a regrid of the AMR hierarchy.
+          See Table~\ref{tab_trans_ops} for the current options. 
+
+\item {\bf phys\_bdy\_type:} a pointer to an array of ($2\times dim$) elements. {\em option not yet implemented}
+
+\end{list}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_NO\_INJECT       & no injection \\
+PAMR\_STRAIGHT\_INJECT & straight injection\\
+PAMR\_HW\_RESTR        & half-weight restriction\\
+PAMR\_FW\_RESTR        & full-weight restriction\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Current fine to coarse level injection operators (defined in {\bf /include/pamr.h})
+\label{tab_inj_ops}}
+\end{table}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_NO\_INTERP       & no interpolation \\
+PAMR\_SECOND\_ORDER    & second order polynomial interpolation\\
+PAMR\_FOURTH\_ORDER    & fourth order polynomial interpolation\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Current coarse to fine level interpolation operators (defined in {\bf /include/pamr.h})
+\label{tab_interp_ops}}
+\end{table}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_NO\_SYNC         & no synchronization \\
+PAMR\_SYNC\            & enforce single-valuedness in overlap regions\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Current inter-level synchronization options (defined in {\bf /include/pamr.h})
+\label{tab_sync_ops}}
+\end{table}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_NO\_TRANSFER     & no transfer \\
+PAMR\_SECOND\_ORDER    & second order polynomial interpolation\\
+PAMR\_FOURTH\_ORDER    & fourth order polynomial interpolation\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Current regrid transfer operators (defined in {\bf /include/pamr.h}). If transferring
+data between hierarchies, data is first interpolated from coarse to fine levels
+via the operator specified above, then data is copied from existing data at the same level.
+\label{tab_trans_ops}}
+\end{table}
+
+%%---------------------------------------------------------------------------------------
+
+\noindent 
+The following is a short-cut to {\em PAMR\_def\_var\_full()}, and defines a new
+variable {\bf name} with {\em identical} parameters to those of the
+most recent variable defined. The new variable's starting GFN is returned.
+
+\begin{verbatim}
+int PAMR_def_var_brief(char *name);
+\end{verbatim}
+
+%%---------------------------------------------------------------------------------------
+
+\noindent
+After definition, variable attributes can be changed or queried via the following
+two functions. The arguments have identical meaning to those described in 
+{\em PAMR\_def\_var\_full()}, and the boolean return code indicates if the operation 
+was successful.
+
+\begin{verbatim}
+int PAMR_set_var_attribs(char *name, int in_amrh, int in_mgh, int num_tl, int amr_inject,
+                         int amr_interp, int amr_bdy_interp, int amr_sync, int mg_inject, 
+                         int mg_interp, int mg_sync, int mg_noinj_to_amr, int regrid_transfer, 
+                         int *phys_bdy_type);
+                         
+int PAMR_get_var_attribs(char *name, int *in_amrh, int *in_mgh, int *num_tl, int *amr_inject,
+                         int *amr_interp, int *amr_bdy_interp, int *amr_sync, int *mg_inject, 
+                         int *mg_interp, int *mg_sync, int *mg_noinj_to_amr, int *regrid_transfer, 
+                         int *phys_bdy_type);
+\end{verbatim}
+
+%%---------------------------------------------------------------------------------------
+
+\noindent
+The following set of commands can be used to {\em disabled}, {\em enable}, or 
+query the corresponding state of a variable, respectively. A variable that is
+enabled (disabled) will (will not) have memory allocated for it during 
+{\em subsequent global} regridding operations. 
+Note therefore that the state of a variable will not change 
+immediately upon the execution of one of these commands, only when the 
+next {\em PAMR\_compose\_hierarchy()} that 
+involves {\em the entire hierarchy} is performed.
+
+\begin{verbatim}
+void PAMR_disable_var(char *name);
+void PAMR_enable_var(char *name);
+int PAMR_is_var_enabled(char *name);
+\end{verbatim}
+
+%%---------------------------------------------------------------------------------------
+
+The following is a utility function to map a particular grid function to
+its grid function number (GFN).
+
+\begin{verbatim}
+int PAMR_get_gfn(char *name, int hier, int tl);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} the GFN of the grid function
+                    {\em name}, in hierarchy {\em hier}, at time level {\em tl}.
+                    If the requested grid function doesn't exist, 0 is returned.
+\item {\bf *name:} the name of the grid function.
+\item {\bf hier:} which hierarchy (see Table \ref{tab_hier}).
+\item {\bf tl:} the time level if in the AMR hierarchy, else 0.
+\end{list}
+
+%%==============================================================================
+
+\section{Global Parameters}
+
+The set of functions listed here allow one to set and/or query miscellaneous
+grid hierarchy parameters. The argument descriptions below only describe the
+set-parameters---the query (get) function arguments are identical except
+for the usage of pass-by-reference rather than pass-by-value in some instances.
+Unless otherwise noted, all arguments that are pointers to objects require
+the {\em user} to pre-allocate the memory of the object.
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_lambda(real lambda);
+void PAMR_get_lambda(real *lambda);
+\end{verbatim}
+
+\begin{list}{}{\lsep}
+\item {\bf lambda:} the CFL factor 
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_rho(int *rho_sp, int *rho_tm, int num);
+void PAMR_get_rho(int *rho_sp, int *rho_tm, int num);
+\end{verbatim}
+
+\begin{list}{}{\lsep}
+\item {\bf *rho\_sp:} an array of size {\bf num} (up to a maximum of PAMR\_MAX\_LEVS) defining the spatial refinement 
+                      ratio of levels $1..{\bf num}$ in the hierarchy (with level 1 being the coarsest level). 
+\item {\bf *rho\_tm:} same as {\bf rho\_sp} but for the temporal refinement ratio
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_get_dxdt(int lev, real *dx, real *dt);
+\end{verbatim}
+
+\begin{list}{}{\lsep}
+\item {\bf lev:} a level number of the current AMR hierarchy (1..PAMR\_MAX\_LEVS)
+\item {\bf real *dx:} an array of size {\bf dim} reals ({\bf dim} is the number of
+                      spatial dimensions) that will be filled, upon return, with the mesh spacing of level {\bf lev}.
+                      {\bf dx[i]} cannot be set directly, but is calculated from the current
+                      base grid information and spatial refinement ratios.
+\item {\bf real *dt:} a real that will be set, upon return, with the time discretization scale 
+                      of level {\bf lev}. The base level {\bf dt} is calculated as the minimum of 
+                      over {\bf i} of {\bf lambda*dx[i]}, where {\bf i} runs from $1$ to {\bf dim};
+                      higher level {\bf dt}'s are calculated using the base level {\bf dt} 
+                      and temporal refinement ratio.
+
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_ghost_width(int *ghost_width);
+void PAMR_get_ghost_width(int *ghost_width);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf *ghost\_width:} an array of size {\bf dim}, where {\bf ghost\_width[i-1]} defines the 
+                      number of ghost {\em points} that are needed at artificial grid boundaries 
+                      introduced in the {\bf i} direction via the grid distribution
+                      process.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_periodic_bdy(int *periodic);
+void PAMR_get_periodic_bdy(int *periodic);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf *periodic:} an array of size {\bf dim} defining whether boundary {\bf i} is periodic 
+                       ({\bf periodic[i-1]=true}) or not ({\bf periodic[i-1]=false}, which is the default). If a boundary
+                       is periodic, grids adjacent to it along the right edge (larger coordinate value) 
+                       are extended by an amount proportional to the corresponding ghost width. All PAMR 
+                       communication functions then use this extra domain to enforce the periodicity
+                       of the domain across the boundary.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_min_width(int *min_width);
+void PAMR_get_min_width(int *min_width);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf *min\_width:} an array of size {\bf dim} defining the minimum number of points allowed for any
+                      distributed grid component. In other words, no grid will be split into 
+                      components with a size along dimension {\bf i} smaller than that given
+                      by {\bf min\_width[i-1]}.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_MG_coarse_width(int *min_width);
+void PAMR_get_MG_coarse_width(int *min_width);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf *min\_width:} an array of size {\bf dim} defining the minimum number of points allowed
+                      for any grid in the multigrid hierarchy
+                      (independent of how that grid might be distributed across a network).
+                      In other words, these parameters defined the coarsest possible grid in the
+                      multigrid hierarchy.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_interp_buffer(int interp_buffer);
+void PAMR_get_interp_buffer(int *interp_buffer);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf *interp\_buffer:} an array of size {\bf dim} defining an additional ``communication buffer''
+                      to place around a coarse grid during a coarse-to-fine interpolation step.
+                      This does not affect the size of the region updated on the fine grid,
+                      rather it allows the use of interior interpolation stencils for a broader
+                      set of points on the fine grid (for example, set to 1 for second order interpolation,
+                      and 2 for fourth order).
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_get_global_bbox(real *bbox);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf *bbox:} a vector describing the coordinate bounding box $[x_1,x_2,y_1,y_2,...]$ of the base grid,
+                   as originally specified in {\em PAMR\_init\_context()}
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_gdm(int method);
+void PAMR_get_gdm(int *method);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf method:} specifies how grids are distributed in a parallel environment; see 
+                    Table \ref{tab_gdm_ops} for the current options.
+\end{list}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_GDM\_GRID\_BY\_GRID  & individually splits {\em each} grid in a level among the $n$ nodes in 
+                             the parallel environment \\ 
+                           & [default is to collectively divide
+                             the memory of all grids in a level across the nodes] \\
+PAMR\_GDM\_ALIGN           & forces {\em all} child grid boundaries to be aligned with the mesh of a parent \\
+                           & grid, and does so by increasing the local ghost width, if needed\\
+PAMR\_GDM\_NO\_OVERLAP     & clips all overlapping grids in the sequential hierarchy prior to distribution \\
+                           & (i.e., the only overlap after
+                             {\em PAMR\_compose\_hierarchy()} will be the ghostzones)\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Current grid distribution options (defined in {\bf /include/pamr.h}). Each one
+of these options behaves as an on/off switch (default is off), and the {\bf method}
+parameter passed to {\em PAMR\_set\_gdm()} is the bitwise-or ($|$) of the desired
+set of flags.
+\label{tab_gdm_ops}}
+\end{table}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_trace_lev(int lev);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf lev:} the level of verbosity of PAMR output for {\em PAMR debugging} 
+                 purposes (i.e. these traces will probably not be useful in debugging
+                 any numerical code). 0 is no output, 1 is a function trace, and
+                 options greater than 1 can produce disastrous amounts of output.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_get_max_lev(int hier);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} the current finest level number (1 is coarsest) containing grids in the hierarchy
+                    specified by {\bf hier}
+\item {\bf hier:} which hierarchy (see Table \ref{tab_hier}).
+\end{list}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_AMRH  & the AMR hierarchy \\
+PAMR\_MGH   & the MG hierarchy\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Current grid hierarchies that can exist within a context (defined in {\bf /include/pamr.h}).
+\label{tab_hier}}
+\end{table}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_get_min_lev(int hier);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} the current coarsest level number (will usually be 1) containing grids in the hierarchy
+                    specified by {\bf hier}
+\item {\bf hier:} which hierarchy (see Table \ref{tab_hier}).
+\end{list}
+
+%%==============================================================================
+
+\section{Hierarchy construction}
+Once the context has been initialized and all the variables have been defined,
+{\em PAMR\_compose\_hierarchy()} will distribute and allocate the local memory for 
+a given AMR grid hierarchy. Regridding is performed via subsequent calls to
+{\em PAMR\_compose\_hierarchy()}, which will copy/interpolate (by at most one level) 
+data from like time levels of 
+the old to new hierarchy as specified in the variable definitions. A multigrid (MG) hierarchy can
+be constructed on top of an existing AMR hierarchy via a call to 
+{\em PAMR\_build\_mgh()}, and subsequently removed with {\em PAMR\_destroy\_mgh()}.
+See \cite{fpthesis} for a discussion of a MG hierarchy and how to use it.
+Regridding cannot be performed when a MG hierarchy exists. 
+
+\par
+
+{\bf NOTE:} PAMR does {\em not} interpolate in time when initializing new fine grids,
+            or portions thereof, in a multi time-level hierarchy. This means that
+            if certain time levels are not in sync (which is the case for past time
+            levels in Berger and Oliger style AMR), it is the user's responsibility
+            to do the appropriate temporal interpolation, in {\em new} portions of
+            the fine grid, afterward. In existing regions of the
+            fine grid data is copied from the old level, and this data will (presumably)
+            be at the correct time. In the future support may be added for certain
+            standard temporal interpolation schemes; however, temporal interpolation
+            is a purely local operation (network-wise) and so is not an essential feature for a
+            grid distribution package like PAMR to provide. 
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_compose_hierarchy(int min_lev, int max_lev, int num, int *lev, real *bbox, real t);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf min\_lev,max\_lev:} grids on levels from {\bf min\_lev} to {\bf max\_lev} are to be allocated 
+                               (or reallocated) as specified via the [{\bf lev},{\bf bbox}] 
+                               arrays. During a regrid operation, if no grids are specified on a given
+                               level, then that level is removed from the hierarchy.
+                             
+\item {\bf num:} the number of new grids
+\item {\bf *lev:} an array of size {\bf num}, where {\bf lev[i-1]}$\in 1,2,...$ is the level (1 is 
+                  coarsest) of new grid {\bf i} ($\in 1,2,...${\bf num}).
+\item {\bf *bbox:} an array of size {\bf 2*dim*num}, where
+                  [{\bf bbox[2*dim*(i-1)],...,bbox[2*dim*(i)-1]}] stores
+                  the coordinate bounding box $[x_1,x_2,y_1,y_2,...]$ of new grid {\bf i}.
+\item {\bf t:} the coordinate time of the new levels.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_build_mgh(int min_lev, int max_lev, int tl);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf min\_lev:} the minimum (coarsest) AMR level to partake in the MG hierarchy.
+\item {\bf max\_lev:} the maximum (finest) AMR level to partake in the MG hierarchy.
+                      Note that in general the MG hierarchy will contain coarser levels
+                      than the AMR hierarchy. The coarsest level in the MG hierarchy
+                      is always labeled level $1$; hence some level $\ell>1$ in the MG
+                      hierarchy will correspond to level {\bf min\_lev} of the AMR
+                      hierarchy.
+\item {\bf tl:} the time level of the AMR hierarchy that will be used to populate the MG 
+                hierarchy.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_destroy_mgh();
+\end{verbatim}
+
+%%==============================================================================
+
+\section{Communication}
+
+PAMR provides three basic communication functions: {\em synchronize} grid functions
+that overlap on a given level ({\bf PAMR\_sync}), {\em interpolate} 
+grid functions from a coarse to the
+next finer level ({\bf PAMR\_interp},{\bf PAMR\_AMR\_bdy\_interp}), 
+and {\em inject} grid functions from a fine to the next coarser level ({\bf PAMR\_inject}).
+By default, the particular grid functions involved and the kind of injection/interpolation 
+operations performed are those specified in the variable definitions; however these
+defaults can be overwritten using the {\em transfer bits}, controlled via the
+{\bf...\_tf\_bits} functions described below. Each grid function at each time 
+level in both the AMR and MG hierarchies (i.e. each GFN) has a unique transfer bit associated with
+it, which specifies how the corresponding grids are treated during a communication
+operation (the particular values depend upon the operation, and are listed in
+Tables \ref{tab_inj_ops}, \ref{tab_interp_ops}, \ref{tab_sync_ops} and \ref{tab_trans_ops}).
+By default, PAMR's communication functions call {\bf PAMR\_clear\_tf\_bits}, which turns off
+communication for all grid functions, then {\bf PAMR\_set\_tf\_bits} before doing any 
+communication. To set custom transfer bits using any combination of
+{\bf PAMR\_clear\_tf\_bits}, {\bf PAMR\_set\_tf\_bits} and {\bf PAMR\_set\_tf\_bit},
+the user must call {\bf PAMR\_freeze\_tf\_bits} {\em prior} to invoking any communication
+functions; this stops the communication functions from over-writing the custom transfer bits.
+Afterward, {\bf PAMR\_thaw\_tf\_bits} should be called
+to return to the default communication scheme.
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_sync(int l, int tl, int hierarchy, int AMR_bdy_width);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success, {\bf false} for failure.
+\item {\bf l:} level of the hierarchy to sync.
+\item {\bf tl:} if the AMR hierarchy, the time level to sync.
+\item {\bf hierarchy:} which hierarchy---see Tab. \ref{tab_hier}.
+\item {\bf AMR\_bdy\_width:} if greater than 0, specifies a region about 
+                             AMR boundaries to exclude from consideration.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_inject(int lf, int tl, int hierarchy);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success, {\bf false} for failure
+\item {\bf lf:} the fine level of the hierarchy to inject to coarser level {\bf lf-1}.
+\item {\bf tl:} if the AMR hierarchy, the time level to inject.
+\item {\bf hierarchy:} which hierarchy---see Tab. \ref{tab_hier}.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_interp(int lc, int tl, int hierarchy);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:}  {\bf true} for success, {\bf false} for failure
+\item {\bf lc:} the coarse level of the hierarchy to interpolate to finer level {\bf lc+1}.
+\item {\bf tl:} if the AMR hierarchy, the time level to interpolate.
+\item {\bf hierarchy:} which hierarchy---see Tab. \ref{tab_hier}.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_AMR_bdy_interp(int lc, int tl, int AMR_bdy_width);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success, {\bf false} for failure
+\item {\bf lc:} the coarse level of the AMR hierarchy to interpolate to finer level {\bf lc+1}.
+\item {\bf tl:} the time level to interpolate.
+\item {\bf AMR\_bdy\_width:} this function interpolates to a region of size {\bf AMR\_bdy\_width}
+                             along AMR boundaries on the fine level.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_freeze_tf_bits(void);
+\end{verbatim}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_thaw_tf_bits(void);
+\end{verbatim}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_clear_tf_bits(void);
+\end{verbatim}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_tf_bit(int gf, int val);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf gf:} the grid function number (see {\bf PAMR\_get\_gfn}, {\bf PAMR\_def\_var\_full}) 
+                whose transfer bit will be set to {\bf val}.
+\item {\bf val:} one of the quantities in Tables \ref{tab_inj_ops}, \ref{tab_interp_ops}, 
+                 \ref{tab_sync_ops} and \ref{tab_trans_ops}, depending upon which communication
+                 function will subsequently be used.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_tf_bits(int tl, int hierarchy, int stage);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf tl:} if the AMR hierarchy, the time level whose grids are involved.
+\item {\bf hierarchy:} which hierarchy---see Tab. \ref{tab_hier}.
+\item {\bf stage:} an operation number defining what stage of communication
+                   to set the transfer bits for --- see Tab. \ref{tab_stage_ops}.
+\end{list}
+
+\begin{table}
+\begin{center}
+\begin{tabular}[t]{| c || c |}
+\hline
+parameter & description \\
+\hline
+\hline
+PAMR\_TF\_SYNC& synchronize \\
+PAMR\_TF\_COMPOSE& regrid \\
+PAMR\_TF\_INJECT& inject \\
+PAMR\_TF\_INJECT\_TO\_MG\_LEVEL& inject to a MG level that does not exist in the AMR hierarchy\\
+PAMR\_TF\_INTERP& interpolate \\
+PAMR\_TF\_BDY\_INTERP& boundary interpolate\\
+PAMR\_TF\_MGH\_INIT& inject only functions common to both MG and AMR MG hierarchies\\
+\hline
+\end{tabular}
+\end{center}
+\caption
+{ Options for the {\bf stage} variable of {\bf PAMR\_set\_tf\_bits}.
+\label{tab_stage_ops}}
+\end{table}
+
+%%==============================================================================
+
+\section{Grid-function access}
+
+Once a grid hierarchy has been allocated, the functions described here can be used
+to access the individual grids. A {\em sequential iterator} is used to loop
+through all grids at a given level within a hierarchy; the basic usage is
+demonstrated in the following C example code, which loops through all local grids
+at level 2 in the AMR hierarchy:
+\begin{verbatim}
+   int valid;
+
+   valid=PAMR_init_s_iter(2,PAMR_AMRH,0);
+   while(valid)
+   {
+      // do stuff with current grid  
+     
+      valid=PAMR_next_g();
+   }
+\end{verbatim}
+When an iterator is in a ``valid'' state, all attributes and data associated with the
+corresponding grid can be accessed via the {\bf PAMR\_get\_g\_...} functions below.
+As with other {\bf PAMR\_get\_...} functions, unless otherwise noted any
+information returned through argument pointers requires the user to 
+preallocate the required memory for the object; i.e. PAMR simply copies the
+requested data to the location pointed to by the argument.
+Nested iteration can be performed using the internal iterator stack, accessed
+via {\bf PAMR\_pop\_iter} and {\bf PAMR\_push\_iter}.
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_init_s_iter(int l, int hier, int all);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success (implying that the first grid in the list
+                    of grids at this level can subsequently be accessed), {\bf false} for failure 
+                    (implying either that there are no grids at the requested
+                    level, or some invalid parameters where passed).
+\item {\bf l:} the level (1 is coarsest) of the hierarchy whose grids will be
+               accessed 
+\item {\bf hier:} which hierarchy---see Tab. \ref{tab_hier}.
+\item {\bf all:} if {\bf all=false} then only local grids (i.e. those with function data
+                 and coordinate arrays that are allocated on the local machine)
+                 are iterated through, otherwise all grids are accessed. Note that 
+                 one {\em cannot} access a {\em non-local} grid's data (via {\bf PAMR\_get\_g\_gfs})
+                 or coordinate arrays (via {\bf PAMR\_get\_g\_x}).
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_next_g();
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success (meaning the iterator is referring to a valid grid),
+                    {\bf false} for failure or the iterator has reached the end of the list.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_push_iter();
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success, {\bf false} for failure (internal stack
+                    overflow, or invalid iterator).
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_pop_iter();
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success (with the current grid restored to that
+                    pointed to at the time of the corresponding push), {\bf false} for 
+                    failure (stack empty).
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_get_g_attribs(int *rank, int *dim, int *shape, real *bbox,
+                       int *ghost_width, real *t, int *ngfs, real **x, real **gfs);
+int PAMR_get_g_rank(int *rank);
+int PAMR_get_g_dim(int *dim);
+int PAMR_get_g_shape(int *shape);
+int PAMR_get_g_bbox(real *bbox);
+int PAMR_get_g_ghost_width(int *ghost_width);
+int PAMR_get_g_t(real *t);
+int PAMR_get_g_ngfs(int *ngfs);
+int PAMR_get_g_x(real **x);
+int PAMR_get_g_gfs(real **gfs);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} if the current iterator is valid and hence the returned
+                               fields are valid, {\bf false} otherwise.
+\item {\bf *rank:} the MPI rank of the node where this grid's data is stored
+\item {\bf *dim:} the spatial dimension of the grid
+\item {\bf *shape:} an array of size {\bf dim} that specifies the number of points
+                    along each dimension of the grid $[N_x,N_y,...]$.
+\item {\bf *bbox:} an array of size {\bf 2*dim} that describes the coordinate bounding
+                   box of the grid $[x_1,x_2,y_1,y_2,...]$.
+\item {\bf *ghost\_width:} an array of size {\bf 2*dim} indicating the size of the
+                   ghost region, in points, adjacent to the 
+                   $[x_{min},x_{max},y_{min},y_{max},...]$ boundaries of the grid.
+\item {\bf *t:} the coordinate time $t$.
+\item {\bf *ngfs:} the number of grid functions.
+\item {\bf **x:} an array of size {\bf dim} that will be filled with pointers
+                 to local perimeter coordinate arrays (of size $N_x, N_y, ...$)
+                 {\em if the grid is local}, else the pointers will be set to 0.
+\item {\bf **gfs:} an array of size {\bf ngfs} that will be filled with pointers
+                 to local data arrays (of size $N_x*N_y*...$) if the 
+                 corresponding grid function is allocated,
+                 else the corresponding pointer is set to 0 (if the grid is
+                 non-local, or the hierarchy to which the grid function belongs
+                 does not exist).
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_get_g_level(int *L);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} if the iterator is valid, {\bf false} otherwise.
+\item {\bf *L:} the level number of the current grid.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_get_g_comm(int *comm);
+int PAMR_set_g_comm(int comm);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} if the iterator is valid, {\bf false} otherwise.
+\item {\bf *comm:} whether this grid partakes in any communication functions
+                   ({\bf true} or {\bf false}).
+\end{list}
+
+%%==============================================================================
+
+\section{Time functions}
+
+The following functions manage the time levels within the AMR hierarchy.
+{\bf PAMR\_tick} advances the time of the level by its local $dt$, 
+{\bf PAMR\_get\_time} and {\bf PAMR\_set\_time} can be used to set and read
+the time of a level respectively, and {\bf PAMR\_swap\_tl} swaps time levels 
+in the hierarchy.
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+real PAMR_tick(int lev);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} the time after the ''tick''
+\item {\bf lev:} the level to update
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_swap_tl(int lev, int tl1, int tl2);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success, {\bf false} for failure
+\item {\bf lev:} the level of the AMR hierarchy 
+\item {\bf tl1:} swap grids at time level {\bf tl1} with those at time level {\bf tl2}
+\item {\bf tl2:}
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+real PAMR_get_time(int lev);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} the time associated with AMR level {\bf lev}
+\item {\bf lev:} 
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_set_time(int lev, real t);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf lev:} AMR level
+\item {\bf t:} time to set above level to
+\end{list}
+
+%%==============================================================================
+
+\section{Excision support}
+
+PAMR supports excision in the sense that it will alter the interpolation and injection
+operators near an excised region if desired. The user must supply a routine
+that, when called, initializes a specified grid function to define the excised 
+region. By default excision is off, is turned on via {\bf PAMR\_excision\_on},
+and can subsequently be turned off via {\bf PAMR\_excision\_off}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+int PAMR_excision_on(char *ex_mask_var,
+                     void (*app_fill_ex_mask_fnc)(real *mask, int dim, int *shape, real *bbox, real excised),
+                     real excised, int initialize_now);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} on success, {\bf false} otherwise.
+\item {\bf *ex\_mask\_var:} a function, existing in both the AMR and MG hierarchies
+                            with only a single time level in the AMR hierarchy, that will
+                            be used to define the excised region.
+\item {\bf *app\_fill\_ex\_mask\_fnc:} a pointer to a function that, when called, will initialize
+                            the {\bf dim} dimensional array {\bf mask} (of size {\bf shape} and
+                            bounding box {\bf bbox}) to {\bf excised} where corresponding components
+                            of the grid are excised, and some other number elsewhere.
+                            {\bf NOTE:} the function {\bf app\_fill\_ex\_mask\_fnc} 
+                            will be called during regridding when
+                            the internal hierarchy is only partially built, hence
+                            {\em none} of the PAMR structure or grid function access routines 
+                            should be used by this routine.
+\item {\bf excised:}        The value defining an excised point on the grid
+\item {\bf initialize\_now:} Initialize the mask grid on {\em all} levels now if {\bf initialize\_now}
+                            is {\bf true}, else the mask will only be initialized during the next regrid.
+\end{list}
+
+%%---------------------------------------------------------------------------------------
+
+\begin{verbatim}
+void PAMR_excision_off();
+\end{verbatim}
+
+%%==============================================================================
+
+\section{I/O routines}
+
+{\bf PAMR\_save\_gfn} can be used to save grid functions to the local disk in SDF 
+\cite{rnpl} format. {\bf PAMR\_cp} is for check-pointing, and saves
+the current state of the hierarchy to disk.
+
+\begin{verbatim}
+int PAMR_save_gfn(char *name, int hier, int tl, int L, real t, char *pre_tag, char *post_tag);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} if successful, implying that the grid function {\bf name}
+                               in hierarchy {\bf hier} (see Table \ref{tab_hier}), 
+                               level {\bf L} (-1 for all) and time level {\bf tl}
+                               was appended to the SDF file 
+
+                               $<{\bf pre\_tag}><{\bf name}>[\_{\bf tl}|\_MG]<{\bf post\_tag}>\_<rank>.sdf$,
+
+                               with a time parameter {\bf t} (-1 to use the current time of 
+                               the grid function). The time level {\bf tl} is inserted for
+                               AMR hierarchy functions, and the letters ``MG'' for functions
+                               in the MG hierarchy. The {\bf rank} is the MPI rank.
+
+\item {\bf *name:} grid function name
+\item {\bf hier:} which hierarchy (see Table \ref{tab_hier})
+\item {\bf tl:} the time level if the AMR hierarchy, else 0
+\item {\bf L:} the level 
+\item {\bf t:} the output time to use (set to -1 to use the current grid function time)
+\item {\bf *pre\_tag:} a prefix tag for the filename
+\item {\bf *post\_tag:} a postfix tag for the filename
+\end{list}
+
+\begin{verbatim}
+int PAMR_cp(char *cp_name, int cp_rank);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} if succesfull, {\bf false} otherwise
+\item {\bf *cp\_name:} The base name for the set of checkpoint files to
+be saved; see {\em PAMR\_init\_context()}.
+\item {\bf cp\_rank:} currently {\bf cp\_rank} must be $-1$.
+\end{list}
+
+%%==============================================================================
+
+\section{Miscellaneous routines}
+
+%%---------------------------------------------------------------------------------------
+
+{\bf PAMR\_merge\_bboxes} is a utility routine to help programs produce the global list
+of bounding boxes that define a grid hierarchy (as required by {\bf PAMR\_compose\_hierarchy}),
+from a local set of bounding boxes as would be computed via local truncation error estimates
+(for instance). Each node passes its local list of {\bf local\_num} bounding boxes in
+{\bf local\_bbox}, and a preallocated memory block in {\bf global\_bbox} that can hold up
+to {\bf global\_num} bounding boxes. PAMR will then merge together the local lists, joining
+two bounding boxes if the ``efficiency'' of the merge, defined as
+\begin{equation}
+efficiency = {\rm volume}(A {\rm union} B)/{\rm volume}(C)
+\end{equation}
+is larger that {\bf min\_eff}. In the above, $A$ and $B$ are two local bounding boxes, and $C$ 
+is the smallest rectangular bounding box encompassing $A$ and $B$.
+Upon completion, {\bf global\_num} is set to the total number of merged grids.
+
+\begin{verbatim}
+int PAMR_merge_bboxes(real *local_bbox, int local_num, real *global_bbox, int *global_num, real min_eff);
+\end{verbatim}
+\begin{list}{}{\lsep}
+\item {\bf return:} {\bf true} for success, {\bf false} for failure.
+\item {\bf *local\_bbox:} an array of size {\bf 2*dim*local\_num} reals
+\item {\bf local\_num:} the number of local bounding boxes
+\item {\bf *global\_bbox:} an array of size {\bf 2*dim*(*global\_num)} reals
+\item {\bf *global\_num:} as input, the maximum number of bounding boxes the array {\bf global\_bbox}
+                          can hold, and upon completion is set to the actual number of 
+                          merged bounding boxes.
+\item {\bf min\_eff:} a number between $0$ and $1$, as described above.
+\end{list}
+
+{\bf PAMR\_get\_sgh}
+
+\begin{thebibliography}{1}
+\bibitem{fpthesis} F. Pretorius,
+ ``Numerical Simulations of Gravitational Collapse'',
+ {\em Univ. of British Columbia Ph.D. Thesis} (2002)
+\bibitem{rnpl} R.L. Marsa and M.W. Choptuik,
+ ``The RNPL User's Guide'',
+ {http://laplace.physics.ubc.ca/Members/marsa/rnpl/users\_guide/users\_guide.html}
+ (1995)
+\end{thebibliography}
+\end{document}

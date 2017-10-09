@@ -1,0 +1,106 @@
+#---------- SRHD fixed parameter file ----------------------------------
+dim := 3
+num_evo_tl := 2
+ic_n := 2
+
+v_tag := "_v"
+
+hyperbolic_vars := [ "Sx" "Sy" "Sz" "E" "d" ]
+fc_vars := [ "Sx" "Sy" "Sz" "E" "d" ]
+AMRH_work_vars := [ "rho" "vx" "vy" "vz" "u" "P" "T" "cs" "Sx_p" "Sy_p" "Sz_p" "E_p" "d_p" ]
+
+TRE_vars := [ "d" ]
+
+app_name := ["Special Relativistic Hydro Code"]
+
+ghost_width := [2 2 2]
+t0 := 0
+
+amr_inject := [ "Sx" "Sy" "Sz" "E" "d" ]
+amr_sync := [ "Sx" "Sy" "Sz" "E" "d" "rho" ]
+amr_interp2 := [ "Sx" "Sy" "Sz" "E" "d" ]
+amr_transfer2 := [ "Sx" "Sy" "Sz" "E" "d" ]
+
+#---------- SRHD run-time parameter file ---------------------------------
+
+gamma := 1.6666666666666666666
+limiter := 1
+
+x0         := 0.5
+rho_l      := 10.0
+rho_r      := 1.0
+u_l        := 19.995
+u_r        := 1.0e-6
+ut_l       := 1.0
+ut_r       := 1.0
+ux_l       := 0.0
+ux_r       := 0.0
+uy_l       := 0.0
+uy_r       := 0.0
+uz_l       := 0.0
+uz_r       := 0.0
+T_l        := 0.0
+T_r        := 0.0
+
+echo_params := 1
+pamr_trace_lev := 0
+evo_trace := 4
+evo_DV_trace := 0
+ID_DV_trace := 2
+eos_flag := 0
+rho0 := 1.0e5
+Ye := 0.5
+
+#--------------------------------------------------------------------------
+
+base_shape := [ 55 5 5 ]
+base_bbox := [-0.04 1.04 -0.04 0.04 -0.04 0.04]
+max_lev := 3
+min_width := [5 5 5]
+min_mg_cwidth := [5 5 5]
+lambda := 0.50
+rho_sp := 2
+rho_tm := 2
+t_interp_substeps := [0.0 0.5 1.0]
+TRE_max = 0.1
+TRE_max_hydro = [ 1.0  0.01  0.01]
+
+gdm_method := 1
+
+steps := 40
+evo_max_iter := 3
+evo_min_iter := 3
+skip_frg := 1
+evo_ssc := 0
+
+AMR_bdy_width := 3
+AMR_bdy_width_c := 2
+re_interp_width := 3
+re_interp_width_c := 2
+
+id_method := 0
+
+np1_initial_guess := 1
+io_node := 0
+
+evo_tol := 1e-2
+regrid_interval := 1
+TRE_norm := 1
+TRE_ibc_buffer := 4
+regrid_script := 0
+regrid_script_name = "srhd_L0.rgs"
+
+num_save_1_vars := 2
+save_1_vars := [ "rho" "u" ]
+
+num_save_2_vars := 1
+save_2_vars := [ "d" ]
+
+cls_merge_dist := 4
+cls_method := 0
+cls_align_mode := 1
+
+save_tag := "srhd_"
+
+save_ivec := 1-*/1
+#-----------------------------------------------------

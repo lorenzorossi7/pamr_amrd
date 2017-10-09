@@ -1,0 +1,151 @@
+#---------- NPS fixed parameter file --------------------
+dim := 3
+num_evo_tl := 2
+ic_n := 2
+
+v_tag := "_v"
+
+num_hyperbolic_vars := 5
+hyperbolic_vars := [ "Sx" "Sy" "Sz" "E" "d" ]
+
+num_fc_vars := 5
+fc_vars := [ "Sx" "Sy" "Sz" "E" "d" ]
+
+num_past_bdy_interp_vars := 5
+past_bdy_interp_vars := [ "Sx" "Sy" "Sz" "E" "d" ]
+
+num_elliptic_vars := 1
+elliptic_vars:=["phi_v" ]
+
+num_AMRH_work_vars := 8
+AMRH_work_vars := [ "rho" "rho_v" "vx" "vy" "vz" "P" "u" "Sx_p" "Sy_p" "Sz_p" "E_p" "d_p" ]
+
+num_AMRH_work_in_MGH_vars := 2
+AMRH_work_in_MGH_vars := [ "rho" "rho_v" ]
+
+num_MGH_work_vars := 0
+
+app_name := ["Newtonian Polytropic Star Code"]
+
+ghost_width := [2 2 2]
+t0 := 0
+
+num_amr_inject := 5
+amr_inject := [ "Sx" "Sy" "Sz" "E" "d" ]
+
+num_amr_sync := 6
+amr_sync := [ "Sx" "Sy" "Sz" "E" "d" "rho" ]
+
+num_amr_interp2 := 5
+amr_interp2 := [ "Sx" "Sy" "Sz" "E" "d" ]
+
+num_amr_transfer2 := 6
+amr_transfer2 := [ "Sx" "Sy" "Sz" "E" "d" "phi_v" ]
+
+num_amr_c_to_v2 := 1
+amr_c_to_v2 := [ "rho" ]
+
+num_amr_v_to_c2 := 1
+amr_c_to_v2 := [ "rho_v" ]
+
+num_mg_hw_restr := 2
+mg_hw_restr := [ "phi_v" "rho_v" ]
+
+num_mg_sync := 1
+mg_sync := [ "phi_v" ]
+
+num_mg_interp2 := 1
+mg_interp2 := [ "phi_v" ]
+
+num_interp_AMR_bdy_vars := 1
+interp_AMR_bdy_vars := [ "phi_v" ]
+interp_AMR_bdy_order := 2
+
+num_tn_diss_vars := 0
+num_rg_diss_vars := 3
+rg_diss_vars := [ "phi_v" "phi_extrap_tm1_v" "phi_extrap_tm2_v"]
+#-----------------------------------------------------
+#---------- NBS run-time parameter file -----------------------------------
+
+gamma := 2
+limiter := 1
+p_deplete := 1
+rho_atm := 1e-5
+
+echo_params := 1
+pamr_trace_lev := 0
+MG_trace := 0
+MG_DV_trace := 0
+evo_trace := 4
+evo_DV_trace := 0
+ID_DV_trace := 2
+
+#--------------------------------------------------------------------------
+
+base_shape := [ 17 17 17 ]
+base_bbox := [-10 10 -10 10 -10 10]
+max_lev := 4
+min_width := [5 5 5]
+min_mg_cwidth := [5 5 5]
+lambda := 0.20
+rho_sp := 2
+rho_tm := 2
+t_interp_substeps := [0.0 0.5 1.0]
+gdm_method := 1
+
+steps := 2
+evo_max_iter := 13
+evo_min_iter := 3
+MG_start_iter := 4
+MG_max_iter := 10
+MG_min_iter := 1
+MG_max_citer := 5000
+MG_pre_swp := 3
+MG_pst_swp := 3
+skip_frg := 1
+evo_ssc := 0
+
+AMR_bdy_width := 3
+AMR_bdy_width_c := 2
+re_interp_width := 3
+re_interp_width_c := 2
+
+id_method := 0
+
+np1_initial_guess := 1
+io_node := 0
+
+tn_eps_diss := 0.10
+rg_eps_diss := 0.25
+diss_all_past := 1
+
+evo_tol := 1e-2
+MG_tol := 1e-5
+MG_crtol := 1e-5
+MG_w0 := 1.0
+MG_extrap_method := 0
+MG_eps_c := 1.0
+TRE_max := 0.001
+num_TRE_vars := 0
+TRE_buffer := 4
+TRE_ibc_buffer := 4
+TRE_ibcp_buffer := 0
+regrid_interval := 10000024
+TRE_norm := 1
+regrid_script := 0
+regrid_script_name = "nps_L0.rgs"
+
+num_save_2_vars := 2
+save_2_vars := [ "phi_v" "d" ]
+
+num_save_mg_vars := 1
+save_mg_vars := [ "phi_v" ]
+
+cls_merge_dist := 4
+cls_method := 0
+cls_align_mode := 1
+
+save_tag := "nps_"
+
+save_ivec := 1-*/1
+#-----------------------------------------------------

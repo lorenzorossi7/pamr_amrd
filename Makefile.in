@@ -1,0 +1,94 @@
+.IGNORE:
+
+.SUFFIXES: .C
+
+SHELL = /bin/sh
+
+# PATHS
+
+prefix  = @prefix@
+
+BBH_SYSTEM = @BBH_SYSTEM@
+
+CC     = @CC@
+AR     = @AR@
+RANLIB = @RANLIB@
+
+LIBS       = -lpamr $(MPILIB) @LIBS@ @CCF77LIBS@ 
+LDFLAGS    = @LDFLAGS@ -L. -L./lib @APP_LIB_PATHS@
+CPPFLAGS   = -I. @CPPFLAGS@ -I./include -I$(prefix)/include @APP_INCLUDE_PATHS@ @DEFS@ @BBH_DEFS@
+CFLAGS     = @CFLAGS@ 
+
+CTOF     = mfi
+PERL     = @PERL@ 
+
+F77      = @F77@
+F77FLAGS = @F77FLAGS@
+
+CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)
+CC_LOAD    = $(CC) $(CFLAGS) $(LDFLAGS) 
+
+F77_COMP   = $(F77) $(F77FLAGS) 
+F77_LOAD   = $(F77) $(F77FLAGS) $(F77_LDFLAGS) $(LDFLAGS) 
+
+F77_TRANSFORM = touch
+
+SRC = src amrd
+EXAMPLES = test examples/wave examples/nbs 
+DOCS = doc
+STABLE = $(SRC) $(DOCS) $(EXAMPLES)
+WORK = w
+ALL = $(STABLE) $(WORK)
+
+EXECUTABLES = test1 nbs wave
+
+# targets
+
+install:
+	for f in $(SRC); do \
+		(cd $$f; make install) \
+	done
+#  Kludge to ensure that amrd library gets installed
+	(cd src; make install)
+
+examples: install
+	for f in $(EXAMPLES); do \
+		(cd $$f; make) \
+	done
+
+docs:
+	for f in $(DOCS); do \
+		(cd $$f; make) \
+	done
+
+work: install
+	for f in $(WORK); do \
+		(cd $$f; make) \
+	done
+
+all: $(ALL)
+	echo; echo "Making in $(ALL)"
+	for f in $(ALL); do \
+		(cd $$f; make) \
+	done
+
+debug: 
+	for f in src amrd; do \
+		(cd $$f; make debug) \
+	done
+
+clean:
+	echo; echo "Cleaning up"
+	for f in $(STABLE); do \
+		(cd $$f; make clean) \
+	done
+	(cd bin; rm $(EXECUTABLES) > /dev/null 2>&1) 
+	(cd lib; rm *.a) > /dev/null 2>&1) 
+	rm $(EXECUTABLES) > /dev/null 2>&1
+	rm *.o > /dev/null 2>&1
+	rm *~ > /dev/null
+	rm *.sdf > /dev/null 2>&1
+	rm config.cache config.log config.status > /dev/null 2>&1
+	rm work.pc work.pcl > /dev/null 2>&1
+	rm -r autom4te.cache 2>&1
+	rm Makefile > /dev/null 2>&1

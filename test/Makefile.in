@@ -1,0 +1,64 @@
+.IGNORE:
+
+SHELL = /bin/sh
+
+# PATHS
+
+prefix  = @prefix@
+
+BBH_SYSTEM = @BBH_SYSTEM@
+
+CC     = @CC@
+AR     = @AR@
+RANLIB = @RANLIB@
+
+LIBS       = -lpamr $(MPILIB) @LIBS@ @CCF77LIBS@ 
+LDFLAGS    = -L../lib @LDFLAGS@ -L. -L$(prefix)/lib @APP_LIB_PATHS@ 
+CPPFLAGS   = -I. -I../include @CPPFLAGS@ -I$(prefix)/include @APP_INCLUDE_PATHS@ @DEFS@ @BBH_DEFS@
+CFLAGS     = @CFLAGS@
+
+CTOF     = mfi
+PERL     = @PERL@ 
+
+F77      = @F77@
+F77FLAGS = @F77FLAGS@
+
+CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)
+CC_LOAD    = $(CC) $(CFLAGS) $(LDFLAGS) 
+
+F77_COMP   = $(F77) $(F77FLAGS) 
+F77_LOAD   = $(F77) $(F77FLAGS) $(F77_LDFLAGS) $(LDFLAGS) 
+
+F77_TRANSFORM = touch
+
+EXECUTABLES = test1
+
+# targets
+
+all: $(EXECUTABLES)
+
+.c.o:
+	@CC_TRANSFORM@ $*.c > $*_.c
+	$(CC_COMP) -c $*_.c
+	mv $*_.o $*.o
+
+test1: test1.o 
+	$(CC_LOAD) test1.o $(LIBS) -o test1
+	cp test1 ../bin
+
+test1.o: ../include/pamr.h ../lib/libpamr.a ../include/internal_opts.h test1.c
+
+clean:
+	echo; echo "Cleaning up"
+	for f in $(AUX); do \
+		(cd $$f; make clean) \
+	done
+	(cd bin; rm $(EXECUTABLES) > /dev/null 2>&1) 
+	rm $(EXECUTABLES) > /dev/null 2>&1
+	rm *_.c > /dev/null 2>&1
+	rm *.o > /dev/null 2>&1
+	rm *~ > /dev/null
+	rm *.sdf > /dev/null 2>&1
+	rm config.cache config.log config.status > /dev/null 2>&1
+	rm work.pc work.pcl > /dev/null 2>&1
+	rm Makefile > /dev/null 2>&1

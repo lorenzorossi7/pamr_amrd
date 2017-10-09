@@ -1,0 +1,4 @@
+      integer SIGN_FLAG,PXFLAG,MXFLAG
+      integer PYFLAG,MYFLAG,PZFLAG,MZFLAG 
+      parameter (SIGN_FLAG=1, PXFLAG=2, MXFLAG=4)
+      parameter (PYFLAG=8, MYFLAG=16, PZFLAG=32, MZFLAG=64)

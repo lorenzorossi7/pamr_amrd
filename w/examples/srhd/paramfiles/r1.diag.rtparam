@@ -1,0 +1,86 @@
+#---------- SRHD run-time parameter file ---------------------------------
+#
+# This set of parameters corresponds to the "One-Dimensional
+# Riemann Problem 1" of Zhang and MacFadyen, astro-ph/0505481
+# This time, the shock will be running at a 45 degree angle.
+#
+#-------------------------------------------------------------------------
+gamma := 1.6666666666666666666
+limiter := 1
+eos_flag := 0
+
+x0         := 1.0
+rho_l      := 10.0
+rho_r      := 1.0
+u_l        := 19.995
+u_r        := 1.5e-8
+ut_l       := 1.0
+ut_r       := 1.0
+ux_l       := 0.0
+ux_r       := 0.0
+uy_l       := 0.0
+uy_r       := 0.0
+uz_l       := 0.0
+uz_r       := 0.0
+
+echo_params := 1
+pamr_trace_lev := 0
+evo_trace := 4
+evo_DV_trace := 0
+ID_DV_trace := 0
+
+#--------------------------------------------------------------------------
+t_interp_substeps := [0 0.5]
+bc_type := 1
+N_bound := 2
+riemann_prob := 3
+#--------------------------------------------------------------------------
+
+base_shape := [ 205 205 7 ]
+base_bbox := [-.01 1.01 -.01 1.01 -0.015 0.015]
+max_lev := 1
+min_width := [5 5 5]
+min_mg_cwidth := [5 5 5]
+lambda := 0.50
+rho_sp := 2
+rho_tm := 2
+
+TRE_max_hydro = [ 1.0  0.01  0.01]
+
+gdm_method := 1
+
+steps := 160
+evo_max_iter := 2
+evo_min_iter := 2
+skip_frg := 1
+evo_ssc := 0
+
+AMR_bdy_width := 3
+AMR_bdy_width_c := 2
+re_interp_width := 3
+re_interp_width_c := 2
+
+id_method := 0
+
+np1_initial_guess := 1
+io_node := 0
+
+evo_tol := 1e-2
+regrid_interval := 10000024
+TRE_norm := 1
+TRE_ibc_buffer := 4
+TRE_buffer := 4
+regrid_script := 0
+regrid_script_name = "srhd_L0.rgs"
+
+num_save_1_vars := 2
+save_1_vars := [ "rho" "u" ]
+
+cls_merge_dist := 4
+cls_method := 0
+cls_align_mode := 1
+
+save_tag := "srhd_"
+
+save_ivec := 1-*/1
+#-----------------------------------------------------

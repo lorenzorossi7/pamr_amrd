@@ -1,0 +1,3 @@
+a mdoit 'RM *.sdf; RM fc3d; make; cat fc3d.fparam fc3d.rtparam > fc3d.param; nice /usr/local2/mpich-1.2.4/bin/mpirun -np \!* -machinefile machine_file fc3d fc3d.param'
+a virp 'vi fc3d.rtparam'
+a vifp 'vi fc3d.fparam'

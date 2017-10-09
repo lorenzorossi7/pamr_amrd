@@ -1,0 +1,38 @@
+.IGNORE:
+# Makefile for "PAMR_ref.ps and AMRD_ref.ps"
+
+DOC1=AMRD_ref
+DOC2=PAMR_ref
+
+# Add figure files here
+FIGS1= 
+FIGS2= 
+
+all: $(DOC1).ps $(DOC2).ps
+
+$(DOC1).ps: $(DOC1).tex $(FIGS)
+	latex $(DOC1)
+	latex $(DOC1)
+	latex $(DOC1)
+	dvips -o $(DOC1).ps $(DOC1)
+	ls -lt $(DOC1).ps
+
+$(DOC2).ps: $(DOC2).tex $(FIGS)
+	latex $(DOC2)
+	latex $(DOC2)
+	latex $(DOC2)
+	dvips -o $(DOC2).ps $(DOC2)
+	ls -lt $(DOC2).ps
+
+clean:
+	/bin/rm $(DOC1).ps
+	/bin/rm $(DOC1).aux
+	/bin/rm $(DOC1).log
+	/bin/rm $(DOC1).dvi
+	/bin/rm $(DOC1).end
+	/bin/rm $(DOC2).ps
+	/bin/rm $(DOC2).aux
+	/bin/rm $(DOC2).log
+	/bin/rm $(DOC2).dvi
+	/bin/rm $(DOC2).end
+	/bin/rm Makefile

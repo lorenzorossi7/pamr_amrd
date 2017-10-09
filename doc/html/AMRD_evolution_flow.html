@@ -1,0 +1,87 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>AMRD evolution flow</title>
+</head>
+<body>
+<h4>AMRD: evolution flow <br>
+</h4>
+<span style="font-weight: bold;"><span style="font-weight: bold;"></span></span><span
+ style="font-weight: bold;"></span><br>
+<hr style="width: 100%; height: 2px;"><span style="font-style: italic;"><br>
+</span>file:<span style="font-weight: bold;"> </span><a
+ href="../../amrd/evolve.c"><span style="font-weight: bold;">evolve.c</span></a><span
+ style="font-style: italic;"><br>
+<br>
+NOTE: in the code the recursion is implemented manually via a stack;
+for clarity here we show it as a recursive algorithm<br>
+<br>
+evolve(L,steps)<br>
+{<br>
+&nbsp;&nbsp;&nbsp; repeat (steps) times<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if (regrid time) then regrid from
+the current level L to the finest level Lf<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; tstep(L);&nbsp;&nbsp; //
+integrate equations 1 time step forward on level L<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <span
+ style="color: rgb(51, 51, 255);">app_post_tstep(L)</span>;&nbsp;&nbsp;
+// user post-time-step calculation<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if (L&lt;Lf)
+evolve(L+1,rho_tm);&nbsp;&nbsp; // recursively evolve finer levels<br>
+&nbsp;&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp;&nbsp; if (L&gt;1)<br>
+&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; compute truncation error for
+level L;<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; inject solution from level L to
+L-1;<br>
+&nbsp;&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp;&nbsp; if (L&lt;Lf)&nbsp; solve_elliptics(L);&nbsp;&nbsp;
+// resolve elliptics on coarser levels<br>
+<br>
+&nbsp;&nbsp;&nbsp; here, if specified, we call <span
+ style="color: rgb(51, 51, 255);">app_pre_io_calc()</span> and then
+save data to disk (the save0 and saveL functions in </span><a
+ href="../../amrd/io.c" style="font-weight: bold;">io.c</a><span
+ style="font-style: italic;">)&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <span
+ style="color: rgb(51, 51, 255);"><br>
+</span></span><span style="font-style: italic;">}<br>
+<br>
+tstep(L)<br>
+{<br>
+&nbsp;&nbsp;&nbsp; if (L&gt;1) initialize MG variables via
+extrapolation from past time level information;<br>
+<br>
+</span><span style="font-style: italic;"><span
+ style="font-style: italic;">&nbsp;&nbsp;&nbsp; if (L&gt;2) set
+interior AMR boundaries via interpolation from parent levels;<br>
+</span><br>
+</span><span style="font-style: italic;">&nbsp;&nbsp;&nbsp; repeat
+until residual &lt; tolerance(s)<br>
+&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <span
+ style="color: rgb(51, 51, 255);">app_evolve()</span>;&nbsp;&nbsp; //
+user routine to evolve a single grid one step forwards in time<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <span
+ style="color: rgb(51, 51, 255);">app_evo_residual()</span>;&nbsp;&nbsp;
+// user routine to calculate residual on a single grid<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if (L==Lf &amp;&amp;
+AMRD_num_elliptic_vars&gt;0)&nbsp; vcycle();<br>
+&nbsp;&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp;&nbsp; cycle time levels;<br>
+}<br>
+</span><span style="font-style: italic;"><span
+ style="font-style: italic;"><br>
+</span></span>
+</body>
+</html>

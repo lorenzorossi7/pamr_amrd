@@ -1,0 +1,72 @@
+.IGNORE:
+
+SHELL = /bin/sh
+
+# PATHS
+
+prefix  = @prefix@
+
+BBH_SYSTEM = @BBH_SYSTEM@
+
+CC     = @CC@
+AR     = @AR@
+RANLIB = @RANLIB@
+
+LIBS       = -lpamrw $(MPILIB) @LIBS@ @CCF77LIBS@ 
+LDFLAGS    = -L../lib @LDFLAGS@ -L. -L$(prefix)/lib @APP_LIB_PATHS@ 
+CPPFLAGS   = -I. -I../include @CPPFLAGS@ -I$(prefix)/include @APP_INCLUDE_PATHS@ @DEFS@ @BBH_DEFS@
+CFLAGS     = @CFLAGS@
+
+CTOF     = mfi
+PERL     = @PERL@ 
+
+F77      = @F77@
+F77FLAGS = @F77FLAGS@
+
+CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)
+CC_LOAD    = $(CC) $(CFLAGS) $(LDFLAGS) 
+
+F77_COMP   = $(F77) $(F77FLAGS) 
+F77_LOAD   = $(F77) $(F77FLAGS) $(F77_LDFLAGS) $(LDFLAGS) 
+
+F77_TRANSFORM = touch
+
+EXECUTABLES = test1_w test2_w test3_w
+
+# targets
+
+all: $(EXECUTABLES)
+
+.c.o:
+	@CC_TRANSFORM@ $*.c > $*_.c
+	$(CC_COMP) -c $*_.c
+	mv $*_.o $*.o
+
+test1_w: test1_w.o 
+	$(F77_LOAD) test1_w.o $(LIBS) -o test1_w
+	cp test1_w ../bin
+
+test2_w: test2_w.o 
+	$(F77_LOAD) test2_w.o $(LIBS) -o test2_w
+	cp test2_w ../bin
+
+test3_w: test3_w.o 
+	$(F77_LOAD) test3_w.o $(LIBS) -o test3_w
+	cp test3_w ../bin
+
+#test1_w.o: ../include/pamr.h ../lib/libpamr.a ../include/internal_opts.h test1.c
+
+clean:
+	echo; echo "Cleaning up"
+	for f in $(AUX); do \
+		(cd $$f; make clean) \
+	done
+	(cd bin; rm $(EXECUTABLES) > /dev/null 2>&1) 
+	rm $(EXECUTABLES) > /dev/null 2>&1
+	rm *_.c > /dev/null 2>&1
+	rm *.o > /dev/null 2>&1
+	rm *~ > /dev/null
+	rm *.sdf > /dev/null 2>&1
+	rm config.cache config.log config.status > /dev/null 2>&1
+	rm work.pc work.pcl > /dev/null 2>&1
+	rm Makefile > /dev/null 2>&1

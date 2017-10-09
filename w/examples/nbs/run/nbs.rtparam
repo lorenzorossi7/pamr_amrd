@@ -1,0 +1,83 @@
+#---------- NBS run-time parameter file -----------------------------------
+echo_params := 1
+pamr_trace_lev := 0
+MG_trace := 2
+MG_DV_trace := 0
+evo_trace := 2
+evo_DV_trace := 0
+ID_DV_trace := 0
+
+#-------- KG field initial data (in uncompactified coordinates!!) ---------
+phi_r_amp_1 := 100.0
+phi_r_r0_1 := 0
+phi_r_delta_1 := 0.2
+phi_r_x0_1 := [0.0 0.0 0.0]
+phi_r_ecc_1 := [0 0.0 0]
+
+phi_i_amp_1 := 100.0
+phi_i_r0_1 := 0
+phi_i_delta_1 := 0.2
+phi_i_x0_1 := [0.0 0.0 0.0]
+phi_i_ecc_1 := [0.0 0 0]
+
+#--------------------------------------------------------------------------
+
+base_shape := [17 17 17]
+base_bbox := [-1 1 -1 1 -1 1]
+max_lev := 3
+min_width := [5 5 5]
+min_mg_cwidth := [5 5 5]
+lambda := 0.01
+rho_sp := 2
+rho_tm := 3
+
+gdm_method := 1
+
+steps := 32
+evo_max_iter := 10
+evo_min_iter := 1
+MG_max_iter := 100
+MG_min_iter := 1
+MG_max_citer := 5000
+MG_pre_swp := 3
+MG_pst_swp := 3
+skip_frg := 1
+evo_ssc := 0
+
+id_method := 0
+
+np1_initial_guess := 1
+io_node := 0
+
+tn_eps_diss := 0.10
+rg_eps_diss := 0.25
+diss_all_past := 1
+
+evo_tol := 1e-2
+MG_tol := 1e-2
+MG_crtol := 1e-2
+MG_w0 := 1.0
+MG_extrap_method := 0
+MG_eps_c := 1.0
+TRE_max := 0.001
+num_TRE_vars := 2
+TRE_vars := [ "phi_r" "phi_i" ]
+TRE_buffer := 4
+TRE_ibc_buffer := 4
+TRE_ibcp_buffer := 0
+regrid_interval := 1024
+TRE_norm := 1
+regrid_script := 2
+regrid_script_name = "nbs_L0.rgs"
+
+num_save_2_vars := 3
+save_2_vars := [ "V" "phi_r" "phi_i" ]
+
+cls_merge_dist := 4
+cls_method := 0
+cls_align_mode := 1
+
+save_tag := "nbs_"
+
+save_ivec := 1-*/1
+#-----------------------------------------------------

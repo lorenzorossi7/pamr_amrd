@@ -1,0 +1,51 @@
+#---------- NBS fixed parameter file --------------------
+dim := 3
+num_evo_tl := 2
+ic_n := 2
+
+num_hyperbolic_vars := 2
+hyperbolic_vars := [ "phi_r" "phi_i" ]
+
+num_elliptic_vars := 1
+elliptic_vars:=["V"]
+
+num_AMRH_work_vars := 2
+AMRH_work_vars := [ "w1" "se_res" ]
+
+num_MGH_work_vars := 0
+
+app_name := ["Newtonian Boson Star Code"]
+
+ghost_width := [2 2 2]
+t0 := 0
+
+num_amr_inject := 2
+amr_inject := [ "phi_r" "phi_i" ]
+
+num_amr_sync := 2
+amr_sync := [ "phi_r" "phi_i" ]
+
+num_amr_interp4 := 2
+amr_interp4 := [ "phi_r" "phi_i" ]
+
+num_amr_transfer4 := 3
+amr_transfer4 := [ "phi_r" "phi_i" "V" ]
+
+num_mg_hw_restr := 3
+mg_hw_restr := [ "V" "phi_r" "phi_i" ]
+
+num_mg_sync := 1
+mg_sync := [ "V" ]
+
+num_mg_interp2 := 1
+mg_interp2 := [ "V" ]
+
+num_interp_AMR_bdy_vars := 1
+interp_AMR_bdy_vars := [ "V" ]
+interp_AMR_bdy_order := 4
+
+num_tn_diss_vars := 2
+tn_diss_vars := [ "phi_r" "phi_i" ]
+num_rg_diss_vars := 5
+rg_diss_vars := [ "phi_r" "phi_i" "V" "V_extrap_tm1" "V_extrap_tm2"]
+#-----------------------------------------------------

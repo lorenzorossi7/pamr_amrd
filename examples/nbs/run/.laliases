@@ -1,0 +1,4 @@
+a doit 'cat ../nbs.fparam nbs.rtparam > nbs.param; cp ../nbs .; mpirun -np \!* ./nbs nbs.param'
+a doitn 'cat ../nbs.fparam nbs.rtparam > nbs.param; cp ../nbs .; ./nbs nbs.param'
+
+a doitb 'cat ../nbs.fparam nbs.rtparam_b > nbs.param; cp ../nbs .; ./nbs nbs.param'

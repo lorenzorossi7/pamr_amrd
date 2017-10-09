@@ -1,0 +1,77 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>AMRD MG flow</title>
+</head>
+<body>
+<h4>AMRD: MG flow <br>
+</h4>
+<span style="font-weight: bold;"><span style="font-weight: bold;"></span></span><span
+ style="font-weight: bold;"></span><br>
+<hr style="width: 100%; height: 2px;"><span style="font-style: italic;"><br>
+</span>file: <a href="../../amrd/mg.c"><span style="font-weight: bold;">mg.c</span></a><span
+ style="font-style: italic;"><br>
+<br>
+solve_elliptics(L..Lf,tl)<br>
+{<br>
+&nbsp;&nbsp;&nbsp; while (residual &gt; AMRD_MG_tol)<br>
+&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; vcycle();<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if (t=t0) <span
+ style="color: rgb(51, 51, 255);">app_t0_cnst_data()</span>;&nbsp;&nbsp;&nbsp;
+// user algebraic "constraint" data<br>
+&nbsp;&nbsp;&nbsp; }<span style="color: rgb(51, 51, 255);"><br>
+</span></span><span style="font-style: italic;">}<br>
+<br>
+vcycle()<br>
+{<br>
+&nbsp;&nbsp;&nbsp; // down the V<br>
+<br>
+&nbsp;&nbsp;&nbsp; for (L=Lf; L&gt;0; L--)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if (L&lt;Lf)<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <span
+ style="color: rgb(51, 51, 255);">app_MG_residual(L+1)</span>;&nbsp;&nbsp;
+// calculate residual on level L+1<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; inject grid
+functions from level L+1 to level L;<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <span
+ style="color: rgb(51, 51, 255);">app_L_OP(L)</span>;&nbsp;&nbsp; //
+compute differential operator "L" on level L<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; compute new
+RHS;&nbsp;&nbsp;&nbsp; // (residual + L_OP)<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; for (iter=0; iter &lt; AMRD_MG_pre_swp;
+iter++) <span style="color: rgb(51, 51, 255);">app_MG_relax(L)</span>;&nbsp;&nbsp;
+// pre-CGC relaxation sweeps<br>
+&nbsp;&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp;&nbsp; // up the V<br>
+<br>
+&nbsp;&nbsp;&nbsp; for (L=1; L&lt;=Lf; L++)<br>
+&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if (L&gt;1)
+compute_cgc(L);&nbsp;&nbsp; // compute coarse grid correction (CGC) for
+level L<br>
+<br>
+</span><span style="font-style: italic;"><span
+ style="font-style: italic;">&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; for
+(iter=0; iter &lt; AMRD_MG_pst_swp; iter++) <span
+ style="color: rgb(51, 51, 255);">app_MG_relax(L)</span>;&nbsp;&nbsp;
+// post-CGC relaxation sweeps<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; continue relaxation on any
+"coarsest" grids until residual is down by a factor of AMRD_MG_crtol;<br>
+&nbsp;&nbsp;&nbsp; }<br>
+}<br>
+</span></span>
+</body>
+</html>

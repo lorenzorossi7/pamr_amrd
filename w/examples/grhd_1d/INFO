@@ -1,0 +1,71 @@
+Info file on ghrd_1d, by Branson Stephens.
+
+This is an example of a 1D GR hydro code.  It is basically a hydro version of:
+
+"Project 2: Gravitational collapse in the spherically symmetric Einstein-
+Klein-Gordon system" by Frans Pretorius & Richard Price (2008). 
+
+Note that the code is still not ready for multi-processors or AMR.  The
+initial data routine would have to be modified to account for this, as well
+as the treatment of the boundaries in hydro_1step (and probably other 
+places as well).
+
+The const_ev flag in the input file allows one to do constrained evolution,
+meaning that the Hamiltonian constraint is solved as an elliptic equation
+for \psi (the conformal factor) after each time step.  Free evolution 
+(const_ev = 0) seems to work at the moment, while constrained evolution does
+not work.
+
+Free evolution, however, results in constraint growth which is barely 
+first order convergent.  This is because, in evaluating the Hamiltonian 
+constraint (HC), one must calculate the second derivative of \psi.  This
+second derivative has jagged features which grow with time.  These jagged
+features seem to stem from non-smoothness in the initial data.  The 
+non-smoothness is much more prominent with the Shen equation of state than
+with an analytic \Gamma-law EOS.  
+
+When I tried constrained evolution, however, the code crashes after only
+a few timesteps.  The MG solver seems to be driven unstable and eventually
+gives INF and NaN.  I believe this is caused by the following inconsistency:
+Suppose you have just completed an update of the conservative hydro variables.
+You now wish to re-solve the elliptics for the metric variables.  In order
+to do this, you need the matter sources for the Einstein equations.  But
+to calculate these matter sources, one must invert the conservative variables
+to find the primitive hydro variables.  This inversion, however, requires
+the metric on this updated time level, which is not yet available.  Thus, 
+a time-extrapolated guess is used for the metric variables in the inversion.
+The matter sources are then calculated and used in the solution of the
+elliptic equations for \alpha, \beta, and \psi.  But, in general, the new
+solution for the metric variables will differ from the extrapolated guess.
+This renders the primitive variable inversion inconsistent.  Eventually, 
+this inconsistency leads to a large residuals when the MG technique is
+invoked, and MG solver cannot recover from it. 
+
+I tried to fix this by introducing a hook function (app_find_primitives),
+so that I could re-do the primitive variable inversion and calculation
+of the sources after each v-cycle of the elliptic solver.  This, however,
+did not prolong the life of the simulation.  I assume that's because the 
+elliptic variables can change enough during one v-cycle that the 
+inconsistency still arises.
+
+It should be noted that if \psi is allowed to evolve freely, this kind
+inconsistency could still affect the evolution of \alpha and \beta.
+Somehow, this does not lead to problems with the evolution.  On the 
+other hand, it is not too surprising, since these are freely-specifiable
+gauges.  
+
+Note on the elliptic solver subroutines in num_w.f:
+I did a lot of back-and-forth with the boundary conditions at the center
+of the star and the outer boundary.  Sometimes I use Neumann BCs and
+sometimes Dirichlet.  Sometimes I approximated the derivatives using
+first order one-sided differences, and sometimes with second order one-sided
+differences.  For the \psi equation, I found that the only suitable
+BC at the center was to use the fact that 
+
+1\r \partial \psi / \partial r = \partial^2 \psi / \partial r^2
+
+at r=0.  Hence the funny factor of three in the equation.  I left in the
+code the options which seem to work best.  The other options were 
+(in many cases) commented out instead of deleted.  This is why 
+the subroutines are so nasty looking.
+

@@ -1,0 +1,85 @@
+#---------- SRHD run-time parameter file -----------------------------------
+#    
+#    Parameters for the Sod shock problem as in Zink et al, arXiv:0712.0353.
+#
+#---------------------------------------------------------------------------
+
+gamma := 1.33333333333333333333
+limiter := 1
+eos_flag := 0
+
+x0         := 0.5
+rho_l      := 1.0
+rho_r      := 0.125
+u_l        := 1.5
+u_r        := 0.15
+ut_l       := 1.0
+ut_r       := 1.0
+ux_l       := 0.0
+ux_r       := 0.0
+uy_l       := 0.0
+uy_r       := 0.0
+uz_l       := 0.0
+uz_r       := 0.0
+
+echo_params := 1
+pamr_trace_lev := 0
+evo_trace := 4
+evo_DV_trace := 0
+ID_DV_trace := 0
+
+#--------------------------------------------------------------------------
+t_interp_substeps := [0 0.5]
+bc_type := 0
+N_bound := 2
+riemann_prob := 0
+#--------------------------------------------------------------------------
+
+base_shape := [ 205 7 7 ]
+base_bbox := [-0.01 1.01 -.03 0.03 -0.03 0.03]
+max_lev := 1
+min_width := [5 5 5]
+min_mg_cwidth := [5 5 5]
+lambda := 0.50
+rho_sp := 2
+rho_tm := 2
+
+num_TRE_max_hydro = 3
+TRE_max_hydro = [ 1.0  0.01  0.01]
+
+gdm_method := 1
+
+steps := 280
+evo_max_iter := 2
+evo_min_iter := 2
+skip_frg := 1
+evo_ssc := 0
+
+AMR_bdy_width := 3
+AMR_bdy_width_c := 2
+re_interp_width := 3
+re_interp_width_c := 2
+
+id_method := 0
+
+np1_initial_guess := 1
+io_node := 0
+
+evo_tol := 1e-2
+regrid_interval := 10000024
+TRE_norm := 1
+TRE_ibc_buffer := 4
+TRE_buffer := 4
+regrid_script := 0
+regrid_script_name = "srhd_L0.rgs"
+
+save_1_vars := [ "rho" "u" "vx" ]
+
+cls_merge_dist := 4
+cls_method := 0
+cls_align_mode := 1
+
+save_tag := "srhd_"
+
+save_ivec := 1-*/1
+#-----------------------------------------------------

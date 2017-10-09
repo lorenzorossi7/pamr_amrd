@@ -1,0 +1,78 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
+	<TITLE>AMRD evolution flow</TITLE>
+	<META NAME="GENERATOR" CONTENT="OpenOffice.org 2.0  (Linux)">
+	<META NAME="CREATED" CONTENT="20080529;21444500">
+	<META NAME="CHANGED" CONTENT="20080530;21092600">
+</HEAD>
+<BODY LANG="en-US" DIR="LTR">
+<H4>AMRD: evolution flow 
+</H4>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<HR>
+<P>&lt;&gt;<I><BR></I>file: <A HREF="../../amrd/evolve.c"><B>evolve.c</B></A><I><BR><BR>NOTE:
+in the code the recursion is implemented manually via a stack; for
+clarity here we show it as a recursive algorithm</I></P>
+<P><I><FONT COLOR="#009900">green: suggested additions for Berger &amp;
+Collela. <BR><BR>NOTES: <BR>(1) all flux_correction_storage (fcs)
+grid functions should be initialized to zero (PAMR does this by
+default when a new hierarchy is composed), and set_flux_mask() must
+be called for all levels in the hierarchy prior to the first call to
+evolve().  <BR>(2) the number of AMR boundary cells (set via
+“guard_cell_width”) must be an integer (&gt;0) multiple of
+rho_tm.<BR>(3) require a minimum buffer adjacent to AMR boundaries
+between successive levels of at least guard_cell_width cells.</FONT></I></P>
+<P><I><FONT COLOR="#009900">set_flux_mask(L)<BR>{<BR>    if (L&gt;1)
+then<BR>   {<BR>      zero flux_mask; <BR>      set flux_mask as
+appropriate at cells<BR>            (A) to be flux corrected on level
+L after rho_tm child cell evolution steps on level L+1;<BR>          
+ (B) that will provide an additive correction to parent cells on
+level L-1;<BR>            // NOTE: (A) cells on level L map to (B)
+cells on level L+1 and vice versa.<BR>   }<BR>}<BR></FONT><BR>evolve(L,steps)<BR>{<BR></I>
+  <I>repeat (steps) times<BR>   {<BR>      if (regrid time) then <BR>
+    {<BR>         regrid from the current level L to the finest level
+Lf; <BR>         <FONT COLOR="#3333ff">app_post_regrid(L..Lf)</FONT><FONT COLOR="#000000">;
+<BR>         <FONT COLOR="#009900">set_flux_mask(L-1..Lf);</FONT><BR>
+    }</FONT><BR><FONT COLOR="#009900"><BR>      </FONT><FONT COLOR="#3333ff">app_pre_tstep(L)</FONT>;<BR>
+     tstep(L);  // integrate equations 1 time step forward on level
+L<BR>      <FONT COLOR="#3333ff">app_post_tstep(L)</FONT>;<BR><BR>   
+  <FONT COLOR="#009900">negate fluxes computed at cells (A);<BR>     
+if (L&lt;Lf) interpolate fcs variables from L to L+1; <BR>      //
+NOTE: because of the restriction (3), only parts of level L
+containing (A) cells will get interpolated to level L+1 in the
+preceding step,<BR>      // i.e. we won't “pollute” regions on
+level L+1 with level L's (B) cells fcs variables<BR></FONT><BR>     
+if (L&lt;Lf) evolve(L+1,rho_tm); // recursively evolve finer levels</I></P>
+<P><FONT COLOR="#009900">      <I>apply flux correction to
+conservative grid functions at cells (A) on level L;<BR>     
+app_post_flux_correct(L);<BR>      zero fcs grid functions at cells
+(A) on level L; (*)</FONT><BR>   }<BR><BR>   if (L&gt;1)<BR>   {<BR> 
+    compute truncation error for level L; <FONT COLOR="#3333ff">app_scale_tre(L)</FONT><FONT COLOR="#000000">;</FONT><BR>
+     inject solution from level L to L-1; <BR>      <FONT COLOR="#009900">inject
+fcs grid functions from L to L-1;<BR>      // NOTE: again, because of
+restriction (3), AND because of step (*) above, only (B) cells will
+get injected to level L in the preceding step<BR>      zero fcs grid
+function at cells (B) on level L;</FONT></I><BR>   <I>}<BR><BR>&nbsp;&nbsp;&nbsp;
+if (L&lt;Lf)&nbsp; solve_elliptics(L);&nbsp;&nbsp; // resolve
+elliptics on coarser levels<BR><BR>&nbsp;&nbsp;&nbsp; here, if
+specified, we call <FONT COLOR="#3333ff">app_pre_io_calc()</FONT> and
+then save data to disk (the save0 and saveL functions in </I><A HREF="../../amrd/io.c"><B>io.c</B></A><I>)&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; <FONT COLOR="#3333ff"><BR></FONT>}<BR><BR>tstep(L)<BR>{<BR>&nbsp;&nbsp;&nbsp;
+if (L&gt;1) initialize MG variables via extrapolation from past time
+level information;<BR><BR></I>&nbsp;&nbsp;&nbsp; <I>if (L&gt;2) set
+interior AMR boundaries via interpolation from parent levels;</I> 
+</P>
+<P>&nbsp;&nbsp;&nbsp; <I>repeat until residual &lt; tolerance(s)<BR>&nbsp;&nbsp;&nbsp;
+{<BR>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <FONT COLOR="#3333ff">app_evolve()</FONT>;&nbsp;&nbsp;
+// user routine to evolve a single grid one step forwards in time<BR>&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; <BR>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+<FONT COLOR="#3333ff">app_evo_residual()</FONT>;&nbsp;&nbsp; // user
+routine to calculate residual on a single grid<BR>&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; <BR>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; if
+(L==Lf &amp;&amp; AMRD_num_elliptic_vars&gt;0)&nbsp; vcycle();<BR>&nbsp;&nbsp;&nbsp;
+}<BR><BR>&nbsp;&nbsp;&nbsp; cycle time levels;<BR>}</I></P>
+</BODY>
+</HTML>

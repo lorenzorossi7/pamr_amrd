@@ -1,0 +1,31 @@
+      double precision r1,r2,t1,t2,t12,t22,y1,y2,table
+      integer nt,nr,ny,numel
+      parameter (nt=180,nr=180,ny=50,numel=16)
+      common /tabl/ table(numel,ny,nr,nt)
+c     r1  =  5.0d0
+      r1  =  1.0d0
+      r2  =  15.0d0
+      t1  = -2.0d0  !  -1.0d0
+      t2  =  1.6d0
+      t12 = -2.0d0  !  -1.0d0
+      t22 =  1.6d0
+      y1  =  0.05d0
+      y2  =  0.513d0
+c--------------------------------------------
+c  table(1,y,r,t)  :: energy per baryon      |
+c  table(2,y,r,t)  :: pressure               |
+c  table(3,y,r,t)  :: entropy per baryon     |
+c  table(4,y,r,t)  :: cv                     |
+c  table(5,y,r,t)  :: xn                     |
+c  table(6,y,r,t)  :: xp                     |
+c  table(7,y,r,t)  :: xa                     |
+c  table(8,y,r,t)  :: xh                     |
+c  table(9,y,r,t)  :: za                     | 
+c  table(10,y,r,t) :: aw                     |
+c  table(11,y,r,t) :: muhat                  |
+c  table(12,y,r,t) :: gammac                 |
+c  table(13,y,r,t) :: dhy                    |
+c  table(14,y,r,t) :: zht                    |
+c  table(15,y,r,t) :: mue                    |
+c  table(16,y,r,t) :: dpde                   |
+c--------------------------------------------

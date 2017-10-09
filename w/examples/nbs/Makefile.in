@@ -1,0 +1,63 @@
+.IGNORE:
+
+SHELL = /bin/sh
+
+# PATHS
+
+prefix  = @prefix@
+
+BBH_SYSTEM = @BBH_SYSTEM@
+
+CC     = @CC@
+AR     = @AR@
+RANLIB = @RANLIB@
+
+LIBS       = -lpamrw -lamrdw $(MPILIB) @LIBS@ @CCF77LIBS@
+LDFLAGS    = -L../../lib @LDFLAGS@ @LDFLAGS@ -L. -L$(prefix)/lib @BBH_MISC_FLFLAGS@ @APP_LIB_PATHS@ 
+CPPFLAGS   = -I. @CPPFLAGS@ -I../../include -I$(prefix)/include @APP_INCLUDE_PATHS@ @DEFS@ @BBH_DEFS@
+CFLAGS     = @CFLAGS@ 
+
+CTOF     = mfi
+PERL     = @PERL@ 
+
+F77      = @F77@
+F77FLAGS = @F77FLAGS@
+
+CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)
+CC_LOAD    = $(CC) $(CFLAGS) $(LDFLAGS) 
+
+F77_COMP   = $(F77) $(F77FLAGS) 
+F77_LOAD   = $(F77) $(F77FLAGS) $(F77_LDFLAGS) $(LDFLAGS) 
+
+F77_TRANSFORM = touch
+
+.f.o:
+	$(F77_COMP) -c $*.f
+
+.c.o:
+	@CC_TRANSFORM@ $*.c > $*_.c
+	$(CC_COMP) -c $*_.c
+	mv $*_.o $*.o
+
+EXECUTABLES = nbs_w
+OBJECTS = nbs_w.o num_w.o
+
+# targets
+
+all: $(EXECUTABLES)
+
+nbs_w.o: nbs_w.c num_w.h num_w.f 
+
+nbs_w: $(OBJECTS)
+	$(F77_LOAD) $(OBJECTS) $(LIBS) -o nbs_w
+	cp nbs_w ../../bin
+
+clean:
+	echo; echo "Cleaning up"
+	rm *_.c > /dev/null 2>&1 
+	rm *.o > /dev/null 2>&1
+	rm $(EXECUTABLES) > /dev/null 2>&1
+	rm *~ > /dev/null
+	rm *.sdf > /dev/null 2>&1
+	rm config.cache config.log config.status > /dev/null 2>&1
+	rm Makefile > /dev/null 2>&1

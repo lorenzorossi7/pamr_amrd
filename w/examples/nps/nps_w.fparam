@@ -1,0 +1,52 @@
+#---------- NPS fixed parameter file --------------------
+dim := 3
+num_evo_tl := 2
+ic_n := 2
+
+c_tag := ""
+v_tag := "_v"
+
+num_hyperbolic_vars := 5
+hyperbolic_vars := [ "Sx" "Sy" "Sz" "E" "rho"]
+num_elliptic_vars := 1
+elliptic_vars:=["phi_v"]
+
+num_AMRH_work_vars := 7
+AMRH_work_vars := [ "vx" "vy" "vz" "P" "u" "phi" "rho_v"]
+
+num_MGH_work_vars := 0
+
+app_name := ["Newtonian Polytropic Star Code"]
+
+ghost_width := [2 2 2]
+t0 := 0
+
+num_amr_inject := 5
+amr_inject := [ "Sx" "Sy" "Sz" "E" "rho"]
+
+num_amr_sync := 5
+amr_sync := [ "Sx" "Sy" "Sz" "E" "rho"]
+
+num_amr_interp2 := 5
+amr_interp2 := [ "Sx" "Sy" "Sz" "E" "rho"]
+
+num_amr_transfer2 := 6
+amr_transfer2 := [ "Sx" "Sy" "Sz" "E" "rho" "phi_v"]
+
+num_mg_hw_restr := 2
+mg_hw_restr := [ "phi_v" "rho" ]
+
+num_mg_sync := 1
+mg_sync := [ "phi_v" ]
+
+num_mg_interp2 := 1
+mg_interp2 := [ "phi_v" ]
+
+num_interp_AMR_bdy_vars := 1
+interp_AMR_bdy_vars := [ "phi_v" ]
+interp_AMR_bdy_order := 2
+
+num_tn_diss_vars := 0
+num_rg_diss_vars := 3
+rg_diss_vars := [ "phi_v" "phi_extrap_tm1_v" "phi_extrap_tm2_v"]
+#-----------------------------------------------------

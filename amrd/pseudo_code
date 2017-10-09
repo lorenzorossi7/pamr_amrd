@@ -1,0 +1,341 @@
+see "globals.h" for a description of parameters/variables
+
+===================================================================
+
+File: amrd.c
+------------
+
+reads preset paramaters/command line options.
+
+command line: 
+
+> amrd param_file
+
+"param_file" is a parameter file, parsed via the sdf library. Preset
+options include (options written "opt := []" imply that "opt" is
+the same option as define in pamr.h):
+
+#===================================================================
+# param_file
+#
+# NOTE: due the the manner in which the get_param functions work,
+#       for all variable length vector parameters "x" a
+#       parameter "x_num" is needed to tell us how many elements we
+#       have
+#===================================================================
+
+base_shape := [Nx0 Ny0 ... ]
+base_bbox := [x0 x1 y0 y1 ... ]
+max_lev := []
+t0 := []
+lambda := []
+
+rho_sp := #  (sets rho_sp for all levels)
+rho_sp_all := [# # # # ... ] (sets rho_sp for all levels)
+rho_tm := #  (sets rho_sp for all levels)
+rho_tm_all := [# # # # ... ] (sets rho_tm for all levels)
+
+# lists of "hyperbolic_vars" and "ARMH_work_vars" to have the 
+# following attributes (otherwise 0):
+amr_inject := <list> # PAMR_STRAIGHT_INJECT 
+amr_interp2 := <list> # PAMR_SECOND_ORDER 
+amr_interp4 := <list> # PAMR_FOURTH_ORDER 
+amr_sync := <list> # PAMR_SYNC
+amr_transfer2 := <list> # PAMR_SECOND_ORDER
+amr_transfer4 := <list> # PAMR_FOURTH_ORDER
+
+# lists of "elliptic_vars","elliptic_vars_t0" and "MGH_work_vars" to have 
+# the following attributes (otherwise 0):
+mg_straight_inject := <list> # PAMR_STRAIGHT_INJECT 
+mg_hw_restr := <list> # PAMR_HW_RESTR
+mg_fw_restr := <list> # PAMR_FW_RESTR
+mg_sync := <list> # PAMR_SYNC
+
+#===================================================================
+
+steps := <# of CG time steps>
+evo_tol := <evolution tolerance>
+evo_max_iter:= <maximum # of iterations during evolution step>
+evo_min_iter:= <minumum # of iterations during evolution step>
+MG_tol := <MG tolerance>
+MG_crtol := <MG coarse grid tolerance *relative* to MG_tol>
+MG_max_iter := <maximum # of iterations during elliptic step>
+MG_min_iter := <minumum # of iterations during elliptic step>
+MG_max_citer := <maximum # of iterations per coarse level solve>
+MG_pre_swp := <# of pre-CGC sweeps>
+MG_pst_swp := <# of post-CGC sweeps>
+MG_w0 := <Hackbushes scaling parameter>
+np1_initial_guess := <1 = values from tn, 2 = extrapolation, etc. >
+
+#===================================================================
+
+io_node := # of machine to read/write cp files
+restart_file := <file> 
+cp_tag := <cp_tag>
+cp_times := <cp_times_file>  (a list of times when to check-point)
+save_tag := <save_tag>
+
+save_ivec_# := <ivec for times to save level #>
+save_ivec := <ivec of coarse steps to save *all* info>
+vt_times := <file containing list of times to save, all, interpolated data>
+save_n_vars := [vector of variables tl=n vars to save]
+save_mg_vars := [vector of MG variables to save]
+
+coord_names := <"x1|x2|x3">
+
+
+#===================================================================
+echo_params := 0|1   # echoes paramaters at run-time
+
+#===================================================================
+
+TRE_vars := [ vector of evolved variables to use in the TRE ]
+TRE_smooth := <TRE smoothing width>
+TRE_max :=  <maximum TRE>
+
+#===================================================================
+
+#===================================================================
+# END
+#===================================================================
+
+NOTE: CURRENTLY ALL NODES NEED ACCESS TO AN IDENTICAL COPY OF THIS 
+      FILE
+
+--- CODE ----------------------------------------------------------
+
+NOTE: in the following, the level L in statements like "app_evolve(L);"
+      is schematic ... we loop over grids in level, and the user hooks
+      only operate on grids. Similarly, MPI_global() implies we do
+      some reduction over nodes of a local result.
+
+main()
+{
+   <MPI init stuff>
+
+   read(param_file);
+
+   if (restart_file)
+   {
+      PAMR_init_context(...,restart_file,io_node);
+   }
+   else
+   {
+      initialize();  
+      if (!app_id()) generate_id();  
+   }
+
+   evolve(steps);
+
+   PAMR_cp("cp_tag_end",io_node);
+}
+
+
+===================================================================
+File: init.c
+------------
+
+Initializes hierarchy, and supplies driver to calculate intial dada
+
+--- CODE ----------------------------------------------------------
+
+void initialize(void)
+{
+   PAMR_init_context();
+
+   PAMR_set_...();  // set all parameters/variables we define
+
+   app_var_init(); // user must define all variables
+}
+
+void generate_id(void)
+{
+   <initialize context with base grid(s)>
+
+   app_var_clear();
+
+   while(delta_lev>0 && Lf<max_lev)
+   {
+      app_free_data();
+      solve_elliptics(1..Lf);
+      evolve(1);
+      flip_dt();
+      evolve(1);
+   }
+
+   app_free_data();
+   solve_elliptic();
+}
+
+===================================================================
+
+File: driver.c
+--------------
+
+B&O AMR driver routine: NOTE ... not using recursion,
+, as in ad, so that we can easily check-point.
+
+--- CODE ----------------------------------------------------------
+
+evolve(steps)
+{
+   push(steps,1);
+
+   while(!(stack_empty()))
+   {
+      pop(rsteps,L);
+
+      if (rsteps==0)
+      {
+         if (L>1 && regridding_time(L)) compute_TRE(L);
+         if (L>1) PAMR_inject(L,L-1,PAMR_AMRH);
+      }
+      else
+      {
+         if (t!=t0 && regridding_time(L)) regrid(L..Lf);
+
+         if (t!=t0 && L<Lf) solve_elliptics(L..Lf); 
+
+         for all evolved variables
+         {
+            initialize_np1();
+            if (L>1) set_amr_bdy();
+         }
+
+         for all MG variables
+         {
+            MG_extrapolate();
+         }
+
+         iter=0;
+         if (L==Lf) PAMR_build_mgh(Lf,Lf);
+
+         while(  (iter < evo_min_iter ||
+                  MPI_global(app_evo_residual()) > evo_tol || 
+                  (L==Lf && MPI_global(app_MG_residual()) > MG_tol) ||
+                  (L==Lf && iter < MG_min_iter)
+               && iter < evo_max_iter)
+         {
+            iter++;
+            app_evolve(L);
+            PAMR_sync(L,1,PAMR_AMRH);
+            if (L==Lf) vcycle();
+         }
+
+         if (L==Lf) PAMR_destroy_mgh();
+         PAMR_tick(L);
+         cycle_time_levels(L);
+
+         rsteps=rsteps-1;
+         push(rsteps,L);
+
+         if (L<Lf) push(rho_tm[L],L+1);
+      }
+   }
+}
+ 
+compute_TRE(L)
+{
+   PAMR_freeze_tf_bits();
+   for all variables "f" in TRE_vars
+   {
+      PAMR_set_tf_bit(<amrd_w1 at time level 2>,2nd order);
+      copy <f at L-1> to <amrd_w1 at L-1>
+   }
+   PAMR_interp(L-1,2,PAMR_AMRH);
+
+   for all variables "f" in TRE_vars
+   {
+      f_tre(L)=abs(f(L)-amrd_w1(L));
+      smooth(f_tre(L),TRE_smooth);
+   }
+   PAMR_thaw_tf_bits();
+}
+
+regrid(L)
+{
+   1. build local clusters from tre --> raw_local_list
+   2. raw_global_list=PAMR_merge_bboxes(local_raw_list,cls_fuzzy);
+   3. fix clusters for multigrid --> new_global_list 
+   4. PAMR_compose_hierarchy(L,Lf,...);
+}
+
+===================================================================
+File: mg.c
+----------
+
+MG driver.
+
+--- CODE ----------------------------------------------------------
+
+void solve_elliptics(int L1,L2)
+{
+   PAMR_build_mgh(L1,L2);
+
+   iter=0;
+   while(  (iter < MG_min_iter ||
+            MPI_global(app_MG_residual(L2)) > MG_tol )
+         && iter < MG_max_iter) 
+   {
+      vcycle();
+      app_cnst_data(L1..L2);
+   }
+
+   PAMR destroy_mgh();
+}
+
+void vcycle()
+{
+   // down the v
+
+   for (L=mg_max_lev; L>=mg_min_lev; L--)
+   {
+      if (L<mg_max_lev)
+      {
+         // compute residual 
+         app_MG_residual(L+1);
+
+         // inject grid functions (including residual)
+         clear_MG_residual(L);
+         PAMR_inject(L+1,1,PAMR_MGH);
+
+         // compute new RHS
+         set_cmask(L);
+         app_L_op(L);
+         compute_MG_rhs(L); //include 'syncing'
+      }
+
+      for (iter=0; iter < MG_pre_swp; iter++)
+      {
+         res(L)=MPI_global(app_MG_relax(all L));
+         PAMR_sync(L,1,PAMR_MGH);
+      }
+
+   }
+
+   // up the v
+
+   for (L=mg_min_lev; L<=mg_max_lev; L++)
+   {
+      ctol=res(L)*MG_crtol;
+
+      // apply CGC
+      if (L>mg_min_lev) compute_cgc(L);
+
+      for (iter=0; iter < MG_pst_swp; iter++)
+      {
+         res(L)=MPI_global(app_MG_relax(all L));
+         PAMR_sync(L,1,PAMR_MGH);
+      }
+
+      if (there exist coarsest grids at level L)
+      {
+         iter=0; res=ctol+1;
+         while(iter < MG_max_citer && res > ctol)
+         {
+            res=MPI_global(app_MG_relax(coarsest at L));
+            PAMR_sync(coarset at L,1,PAMR_MGH);
+         }
+      }
+   }
+}

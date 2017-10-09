@@ -1,0 +1,46 @@
+c
+      implicit real*8(a-h,o-z)
+c
+      integer q,qx,qn
+      character*7 rstfil,outfil,pltfil,confil,timfil
+      character*7 rstfilj,rstfilu
+      character*7 denfil,flxfil,extfil
+      character*8 label,label1
+      character*4 basenm
+      character*2 suffix
+      character*2 whateos
+c
+      parameter (q=1000)
+      parameter (qx=1000)
+      parameter (qn= 5)
+c
+      common/intgrs/nx,nm,np,nzn,nzn1,nzn2,nzn3,nzn4,nuc,iter,itme,ktme,
+     1nstep,nend,irstrt,nrstrt,nrst,nout,nout1,ncons1,imod,
+     1igeom,igeomx,igrav,iterm,iburn,ideg,ishkbn,itstp,iremap,
+     1kountt,nbegin,iswitch,icvisc,ibstart,icflmin,jshock,ishock
+      common/char2/label,rstfil,outfil,pltfil,denfil,flxfil,extfil,
+     1            rstfilj,rstfilu,basenm,suffix
+      common/float/dt,dth,olddt,time,dtmin,dtmax,tmax,cfl,tcc,xcc,tout,timecvisc,
+     1             bndmnx,bndmxx,uinl,pinl,tinl,gameinl,small,smallx,dtime(10),
+     1             trstrt,trst,tout1,cvisc,pi,pi4,pi43,fpg,g,grdlen,grdm,dti,gravy
+      common/twod/densty(qx),velx(qx),energy(qx),press(qx),temp(qx),dpdt(qx),
+     1       ento(qx),ent(qx),gammae(qx),gammac(qx),xnuc(qx,qn),gpot(qx)
+      common/old/dold(qx),vxold(qx),gold(qx),told(qx),eold(qx),eo(qx),
+     1           xnold(qx,qn),po(qx),eu(qx),euo(qx),qvold(qx),
+     1           aysrco(qx),cysrco(qx),aesrco(qx),cesrco(qx),
+     1           qsrco(qx),esrco(qx),ysrco(qx),bysrco(qx),besrco(qx)
+      common/oned/rho(q),u(q),e(q),p(q),tmp(q),game(q),gamc(q),qv(qx),
+     1            v(q),grav(q),edt(q),s(q),dedt(q),qsrc(qx),esrc(qx),ysrc(qx),
+     1            aysrc(qx),cysrc(qx),bysrc(qx),besrc(qx),aesrc(qx),cesrc(qx),xn(q,qn)
+      common/shockcom/ shockd(q)
+      common/grd/x(q),xl(q),xr(q),dx(q),dm(q),mpp(qx),xzn(q),xznl(q),xznr(q),
+     1    area(q),areal(q),arear(q),dvol(q),dtdx(q),dtdm(q),xlold(q),dvold(q)
+      common/misc/ei(q),ek(q),c(q),ce(q),w(q),cflno(q),edot(q),amas(qn)
+      common/srch/scrch1(q),scrch2(q),scrch3(q),scrch4(q),scrch5(q)
+      common/coef/coeff1(q),coeff2(q),coeff3(q),coeff4(q),coeff5(q)
+      common/newcom/tmass(q),smass(q),dmm(q)
+      common/modelx/modeln
+      character*12 modeln
+      real*8 mpp
+      common /togeos/ whateos
+c
