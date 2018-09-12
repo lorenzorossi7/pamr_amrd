@@ -9,7 +9,7 @@
 #include "mg.h"
 #include "evolve.h"
 #include "math.h"
-#include <malloc.h>
+#include <stdlib.h>
 
 //=============================================================================
 // calculates the region of high TRE (l2 norm of the set of f_tre variables

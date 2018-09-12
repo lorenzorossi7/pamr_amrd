@@ -6,21 +6,21 @@ SHELL = /bin/sh
 
 prefix  = /usr/local
 
-BBH_SYSTEM = LINUX
+BBH_SYSTEM = DARWIN
 
-CC     = mpicc
+CC     = gcc
 AR     = ar
 RANLIB = ranlib
 
-LIBS       = -lpamrw $(MPILIB) -lm -lmpi   -lbbhutil -lgfortran -lm 
-LDFLAGS    = -L../lib  -L/usr/X11R6/lib -L.   -L/usr/local/lib 
-CPPFLAGS   = -I. -I../include -I/home/bantilan/include -DLINUX -DPORT_GROUP -DWant_c_files -I$(prefix)/include   -I/usr/local/include -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DHAVE_LIBMPI=1 -DHAVE_LIBM=1 -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STRDUP=1  -DLINUX -DF77_HAS_SYSTEM -DF77_HAS_CHDIR
+LIBS       = -lpamrw $(MPILIB) -lm -lmpi   -lbbhutil -lg2c -lm 
+LDFLAGS    = -L../lib  -L/usr/X11R6/lib -L/sw/lib -L.   -L/usr/local/lib 
+CPPFLAGS   = -I. -I../include  -DDARWIN -D__L -DWant_c_files -I$(prefix)/include   -I/usr/local/include -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DHAVE_LIBMPI=1 -DHAVE_LIBM=1 -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STRDUP=1 
 CFLAGS     = -g -O2 
 
 CTOF     = mfi
 PERL     = perl 
 
-F77      = mpif77
+F77      = None
 F77FLAGS = -O6 -fno-second-underscore
 
 CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)

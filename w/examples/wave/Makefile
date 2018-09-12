@@ -3,10 +3,10 @@
 SHELL = /bin/sh
 
 prefix = /usr/local
-BBH_SYSTEM = LINUX
+BBH_SYSTEM = DARWIN
 bindir = ../../bin
 
-BBH_SYSTEM = LINUX
+BBH_SYSTEM = DARWIN
 
 RNPL   = rnpl
 
@@ -15,19 +15,19 @@ RANLIB = ranlib
 
 F77_TRANSFORM = touch
 
-LIBS       = -lpamrw -lamrdw $(MPILIB) -lm -lmpi   -lbbhutil -lgfortran -lm 
-LDFLAGS    = -L../../lib  -L/usr/X11R6/lib -L. -L$(prefix)/lib  \
+LIBS       = -lpamrw -lamrdw $(MPILIB) -lm -lmpi   -lbbhutil -lg2c -lm 
+LDFLAGS    = -L../../lib  -L/usr/X11R6/lib -L/sw/lib -L. -L$(prefix)/lib  \
                -L/usr/local/lib
 
-CC       = mpicc
+CC       = gcc
 CFLAGS     = -g -O2 
-CPPFLAGS = -I. -I/home/bantilan/include -DLINUX -DPORT_GROUP -DWant_c_files -I../../include -I$(prefix)/include \
+CPPFLAGS = -I.  -DDARWIN -D__L -DWant_c_files -I../../include -I$(prefix)/include \
              -I/usr/local/include
 
 CC_COMP  = $(CC) $(CPPFLAGS) -c $(CFLAGS)
 CC_LOAD  = $(CC) $(CFLAGS) $(LDFLAGS) 
 
-F77      = mpif77
+F77      = None
 F77FLAGS = -O6 -fno-second-underscore
 
 F77_COMP   = $(F77) -c $(F77FLAGS) 
