@@ -19,7 +19,7 @@ LIBS       = -lpamrw -lamrdw $(MPILIB) -lm -lmpi   -lbbhutil -lg2c -lm
 LDFLAGS    = -L../../lib  -L/usr/X11R6/lib -L/sw/lib -L. -L$(prefix)/lib  \
                -L/usr/local/lib
 
-CC       = gcc
+CC       = mpicc
 CFLAGS     = -g -O2 
 CPPFLAGS = -I.  -DDARWIN -D__L -DWant_c_files -I../../include -I$(prefix)/include \
              -I/usr/local/include
@@ -27,7 +27,7 @@ CPPFLAGS = -I.  -DDARWIN -D__L -DWant_c_files -I../../include -I$(prefix)/includ
 CC_COMP  = $(CC) $(CPPFLAGS) -c $(CFLAGS)
 CC_LOAD  = $(CC) $(CFLAGS) $(LDFLAGS) 
 
-F77      = None
+F77      = mpif77
 F77FLAGS = -O6 -fno-second-underscore
 
 F77_COMP   = $(F77) -c $(F77FLAGS) 

@@ -10,7 +10,7 @@ libdir = $(prefix)/lib
 
 BBH_SYSTEM = DARWIN
 
-CC     = gcc
+CC     = mpicc
 AR     = ar
 RANLIB = ranlib
 
@@ -19,14 +19,14 @@ CTOF     = mfi
 
 PERL     = perl
 
-F77      = None
+F77      = mpif77
 F77FLAGS = -O6 -fno-second-underscore
 
 LIBS       =   -lpamrw $(MPILIB) -lm -lmpi   -lbbhutil -lg2c -lm
 LDFLAGS    =    -L/usr/X11R6/lib -L/sw/lib -L../lib -L.   -L/usr/local/lib 
 
 CFLAGS     = -g -O2
-CPPFLAGS = -I. -I../include/  -DDARWIN -D__L -DWant_c_files -I$(prefix)/include   -I/usr/local/include -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DHAVE_LIBMPI=1 -DHAVE_LIBM=1 -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STRDUP=1 
+CPPFLAGS = -I. -I../include/  -DDARWIN -D__L -DWant_c_files -I$(prefix)/include   -I/usr/local/include -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DHAVE_LIBMPI=1 -DHAVE_LIBM=1 -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STRDUP=1  -DF77_HAS_SYSTEM -DF77_HAS_CHDIR
 
 CC_COMP    = $(CC) $(CPPFLAGS) -c $(CFLAGS)
 CC_LOAD    = $(CC) $(CFLAGS) $(LDFLAGS)
