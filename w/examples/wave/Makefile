@@ -2,7 +2,7 @@
 
 SHELL = /bin/sh
 
-prefix = /usr/local
+prefix = /Users/pau/local
 BBH_SYSTEM = DARWIN
 bindir = ../../bin
 
@@ -17,12 +17,12 @@ F77_TRANSFORM = touch
 
 LIBS       = -lpamrw -lamrdw $(MPILIB) -lm -lmpi   -lbbhutil -lg2c -lm 
 LDFLAGS    = -L../../lib  -L/usr/X11R6/lib -L/sw/lib -L. -L$(prefix)/lib  \
-               -L/usr/local/lib
+               -L/Users/pau/local/lib
 
 CC       = mpicc
 CFLAGS     = -g -O2 
 CPPFLAGS = -I.  -DDARWIN -D__L -DWant_c_files -I../../include -I$(prefix)/include \
-             -I/usr/local/include
+             -I/Users/pau/local/rnpletal/rnpl/include/
 
 CC_COMP  = $(CC) $(CPPFLAGS) -c $(CFLAGS)
 CC_LOAD  = $(CC) $(CFLAGS) $(LDFLAGS) 
