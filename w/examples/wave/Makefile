@@ -22,7 +22,7 @@ LDFLAGS    = -L../../lib  -L/usr/X11R6/lib -L/sw/lib -L. -L$(prefix)/lib  \
 CC       = mpicc
 CFLAGS     = -g -O2 
 CPPFLAGS = -I.  -DDARWIN -D__L -DWant_c_files -I../../include -I$(prefix)/include \
-             -I/Users/pau/local/rnpletal/rnpl/include/
+             -I/Users/pau/local/include
 
 CC_COMP  = $(CC) $(CPPFLAGS) -c $(CFLAGS)
 CC_LOAD  = $(CC) $(CFLAGS) $(LDFLAGS) 
