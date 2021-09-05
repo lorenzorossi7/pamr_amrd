@@ -1,8 +1,0 @@
-lib/libamrd.a
-lib/libpamr.a
-w/Makefile
-w/amrd/Makefile
-w/examples/nbs/Makefile
-w/examples/wave/Makefile
-w/src/Makefile
-w/test/Makefile
