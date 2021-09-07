@@ -1107,6 +1107,8 @@ c        parameter (w4=1.0d0/16.0d0,w3=1.0d0/16.0d0,w2=1.0d0/16.0d0)
         integer pass,npass
         logical no_uc_ex_diss
         parameter (no_uc_ex_diss=.true.)
+        !LR
+        integer applied
         
         eps_eff=eps(1,1,1)
 
@@ -1147,77 +1149,107 @@ c        parameter (w4=1.0d0/16.0d0,w3=1.0d0/16.0d0,w2=1.0d0/16.0d0)
 !LR: equivalent to the commented out piece below, but it does not go out of bounds
                    if (.not.ind_sweeps.or.pass.eq.1) then
                     f_hf=0
-                    if (i.gt.2.and.i.lt.(nx-1)) then
+                    applied=0
+                    if (i.gt.2.and.i.lt.(nx-1).and.
+     &               applied.eq.0) then
                      if ((chr(i-2,j,k).ne.ex.and.chr(i-1,j,k).ne.ex.and.
      &                    chr(i+2,j,k).ne.ex.and.chr(i+1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i-2,j,k)+work(i+2,j,k)
      &                 -4*(work(i-1,j,k)+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.2.and.phys_bdy_type(1).eq.odd) then
+                    end if
+                    if (i.eq.2.and.phys_bdy_type(1).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i-1,j,k).ne.ex.and.
      &                    chr(i+2,j,k).ne.ex.and.chr(i+1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (-work(i,j,k))+work(i+2,j,k)
      &                 -4*(work(i-1,j,k)+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.1.and.phys_bdy_type(1).eq.odd) then
+                    end if
+                    if (i.eq.1.and.phys_bdy_type(1).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i+2,j,k).ne.ex.and.chr(i+1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (-work(i+2,j,k))+work(i+2,j,k)
      &                -4*((-work(i+1,j,k))+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.Nx-1.and.phys_bdy_type(2).eq.odd) then
+                    end if
+                    if (i.eq.(Nx-1).and.
+     &                  phys_bdy_type(2).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i+1,j,k).ne.ex.and.
      &                    chr(i-2,j,k).ne.ex.and.chr(i-1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i-2,j,k)+(-work(i,j,k))
      &                 -4*(work(i-1,j,k)+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.Nx.and.phys_bdy_type(2).eq.odd) then
+                    end if
+                    if (i.eq.Nx.and.phys_bdy_type(2).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i-2,j,k).ne.ex.and.chr(i-1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    work(i-2,j,k)+(-work(i-2,j,k))
      &                -4*(work(i-1,j,k)+(-work(i-1,j,k)))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.2.and.
-     &               phys_bdy_type(1).eq.even) then
+                    end if
+                    if (i.eq.2.and.
+     &               phys_bdy_type(1).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i-1,j,k).ne.ex.and.
      &                    chr(i+2,j,k).ne.ex.and.chr(i+1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (work(i,j,k))+work(i+2,j,k)
      &                 -4*(work(i-1,j,k)+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.1.and.phys_bdy_type(1).eq.even) then
+                    end if
+                    if (i.eq.1.and.phys_bdy_type(1).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i+2,j,k).ne.ex.and.chr(i+1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (work(i+2,j,k))+work(i+2,j,k)
      &                -4*((work(i+1,j,k))+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.Nx-1.and.
-     &               phys_bdy_type(2).eq.even) then
+                    end if
+                    if (i.eq.(Nx-1).and.
+     &               phys_bdy_type(2).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i+1,j,k).ne.ex.and.
      &                    chr(i-2,j,k).ne.ex.and.chr(i-1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i-2,j,k)+(work(i,j,k))
      &                 -4*(work(i-1,j,k)+work(i+1,j,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.eq.Nx.and.phys_bdy_type(2).eq.even) then
+                    end if
+                    if (i.eq.Nx.and.phys_bdy_type(2).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i-2,j,k).ne.ex.and.chr(i-1,j,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    work(i-2,j,k)+(work(i-2,j,k))
      &                -4*(work(i-1,j,k)+(work(i-1,j,k)))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (i.gt.(2-bo1).and.i.lt.(nx-1)) then
+                    end if
+                    if (i.gt.(2-bo1).and.i.lt.(nx-1).and.
+     &               applied.eq.0) then
                      if (chr(i-1,j,k).ne.ex.and.
      &                   chr(i+1,j,k).ne.ex.and.
      &                   chr(i+2,j,k).ne.ex)
@@ -1225,28 +1257,35 @@ c        parameter (w4=1.0d0/16.0d0,w3=1.0d0/16.0d0,w2=1.0d0/16.0d0)
                        f_hf=w3*(
      &                    -work(i-1,j,k)+3*work(i,j,k)
      &                  -3*work(i+1,j,k)+work(i+2,j,k))
+                       applied=1
                      end if
-                    else if (i.gt.2.and.i.lt.(nx-1+bo1)) then
+                    end if
+                    if (i.gt.2.and.i.lt.(nx-1+bo1).and.
+     &               applied.eq.0) then
                      if (chr(i-1,j,k).ne.ex.and.chr(i+1,j,k).ne.ex.and.
      &                   chr(i-2,j,k).ne.ex)
      &               then
                        f_hf=w3*(
      &                    -work(i+1,j,k)+3*work(i,j,k)
      &                  -3*work(i-1,j,k)+work(i-2,j,k))
+                       applied=1
                      end if
-                    else if ((i.gt.(2-bo2).or.
+                    end if
+                    if ((i.gt.(2-bo2).or.
      &                       (i.eq.2.and.chr(1,j,k).eq.ex))
      &                       .and.i.lt.(nx-1).and.
-     &                  (chr(i+1,j,k).ne.ex.and.chr(i+2,j,k).ne.ex) )
-     &              then
+     &                  (chr(i+1,j,k).ne.ex.and.chr(i+2,j,k).ne.ex).and.
+     &               applied.eq.0) then
                        f_hf=w2*(
      &                     work(i,j,k)-2*work(i+1,j,k)+work(i+2,j,k))
+                       applied=1
                     else if (i.gt.2.and.(i.lt.(nx-1+bo2).or.
      &                       (i.eq.(nx-1).and.chr(nx,j,k).eq.ex)).and.
-     &                  (chr(i-1,j,k).ne.ex.and.chr(i-2,j,k).ne.ex) )
-     &              then
+     &                  (chr(i-1,j,k).ne.ex.and.chr(i-2,j,k).ne.ex).and.
+     &               applied.eq.0) then
                        f_hf=w2*(
      &                     work(i,j,k)-2*work(i-1,j,k)+work(i-2,j,k))
+                       applied=1
                     end if
 
                     f(i,j,k)=f(i,j,k)-eps_eff*f_hf
@@ -1349,108 +1388,145 @@ c        parameter (w4=1.0d0/16.0d0,w3=1.0d0/16.0d0,w2=1.0d0/16.0d0)
 !LR: equivalent to the commented out piece below, but it does not go out of bounds
                    if (.not.ind_sweeps.or.pass.eq.2) then
                     f_hf=0
-                    if (j.gt.2.and.j.lt.(ny-1)) then
+                    applied=0
+                    if (j.gt.2.and.j.lt.(ny-1).and.
+     &               applied.eq.0) then
                      if ((chr(i,j-2,k).ne.ex.and.chr(i,j-1,k).ne.ex.and.
      &                    chr(i,j+2,k).ne.ex.and.chr(i,j+1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i,j-2,k)+work(i,j+2,k)
      &                 -4*(work(i,j-1,k)+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.2.and.phys_bdy_type(3).eq.odd) then
+                    end if
+                    if (j.eq.2.and.phys_bdy_type(3).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j-1,k).ne.ex.and.
      &                    chr(i,j+2,k).ne.ex.and.chr(i,j+1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (-work(i,j,k))+work(i,j+2,k)
      &                 -4*(work(i,j-1,k)+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.1.and.phys_bdy_type(3).eq.odd) then
+                    end if
+                    if (j.eq.1.and.phys_bdy_type(3).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j+2,k).ne.ex.and.chr(i,j+1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (-work(i,j+2,k))+work(i,j+2,k)
      &                -4*((-work(i,j+1,k))+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.Ny-1.and.phys_bdy_type(4).eq.odd) then
+                    end if
+                    if (j.eq.Ny-1.and.phys_bdy_type(4).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j+1,k).ne.ex.and.
      &                    chr(i,j-2,k).ne.ex.and.chr(i,j-1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i,j-2,k)+(-work(i,j,k))
      &                 -4*(work(i,j-1,k)+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.Ny.and.phys_bdy_type(4).eq.odd) then
+                    end if
+                    if (j.eq.Ny.and.phys_bdy_type(4).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j-2,k).ne.ex.and.chr(i,j-1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    work(i,j-2,k)+(-work(i,j-2,k))
      &                -4*(work(i,j-1,k)+(-work(i,j-1,k)))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.2.and.phys_bdy_type(3).eq.even) then
+                    end if
+                    if (j.eq.2.and.phys_bdy_type(3).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j-1,k).ne.ex.and.
      &                    chr(i,j+2,k).ne.ex.and.chr(i,j+1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (work(i,j,k))+work(i,j+2,k)
      &                 -4*(work(i,j-1,k)+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.1.and.phys_bdy_type(3).eq.even) then
+                    end if
+                    if (j.eq.1.and.phys_bdy_type(3).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j+2,k).ne.ex.and.chr(i,j+1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (work(i,j+2,k))+work(i,j+2,k)
      &                -4*((work(i,j+1,k))+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.Ny-1.and.
-     &                       phys_bdy_type(4).eq.even) then
+                    end if
+                    if (j.eq.Ny-1.and.
+     &                       phys_bdy_type(4).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j+1,k).ne.ex.and.
      &                    chr(i,j-2,k).ne.ex.and.chr(i,j-1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i,j-2,k)+(work(i,j,k))
      &                 -4*(work(i,j-1,k)+work(i,j+1,k))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.eq.Ny.and.phys_bdy_type(4).eq.even) then
+                    end if
+                    if (j.eq.Ny.and.phys_bdy_type(4).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j-2,k).ne.ex.and.chr(i,j-1,k).ne.ex))
      &               then
                        f_hf=w4*(
      &                    work(i,j-2,k)+(work(i,j-2,k))
      &                -4*(work(i,j-1,k)+(work(i,j-1,k)))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (j.gt.(2-bo1).and.j.lt.(ny-1)) then
+                    end if
+                    if (j.gt.(2-bo1).and.j.lt.(ny-1).and.
+     &               applied.eq.0) then
                      if (chr(i,j-1,k).ne.ex.and.chr(i,j+1,k).ne.ex.and.
      &                   chr(i,j+2,k).ne.ex)
      &               then
                        f_hf=w3*(
      &                    -work(i,j-1,k)+3*work(i,j,k)
      &                  -3*work(i,j+1,k)+work(i,j+2,k))
+                       applied=1
                      end if
-                    else if (j.gt.2.and.j.lt.(ny-1+bo1)) then
+                    end if
+                    if (j.gt.2.and.j.lt.(ny-1+bo1).and.
+     &               applied.eq.0) then
                      if (chr(i,j-1,k).ne.ex.and.chr(i,j+1,k).ne.ex.and.
      &                   chr(i,j-2,k).ne.ex)
      &              then
                        f_hf=w3*(
      &                    -work(i,j+1,k)+3*work(i,j,k)
      &                  -3*work(i,j-1,k)+work(i,j-2,k))
+                       applied=1
                      end if
-                    else if ((j.gt.(2-bo2).or.
+                    end if
+                    if ((j.gt.(2-bo2).or.
      &                       (j.eq.2.and.chr(i,1,k).eq.ex))
      &                       .and.j.lt.(ny-1).and.
-     &                  (chr(i,j+1,k).ne.ex.and.chr(i,j+2,k).ne.ex) )
-     &              then
+     &                  (chr(i,j+1,k).ne.ex.and.chr(i,j+2,k).ne.ex).and.
+     &               applied.eq.0) then
                        f_hf=w2*(
      &                     work(i,j,k)-2*work(i,j+1,k)+work(i,j+2,k))
+                       applied=1
                     else if (j.gt.2.and.(j.lt.(ny-1+bo2).or.
      &                       (j.eq.(ny-1).and.chr(i,ny,k).eq.ex)).and.
-     &                  (chr(i,j-1,k).ne.ex.and.chr(i,j-2,k).ne.ex) )
-     &              then
+     &                  (chr(i,j-1,k).ne.ex.and.chr(i,j-2,k).ne.ex).and.
+     &               applied.eq.0) then
                        f_hf=w2*(
      &                     work(i,j,k)-2*work(i,j-1,k)+work(i,j-2,k))
+                       applied=1
                     end if
 
                     f(i,j,k)=f(i,j,k)-eps_eff*f_hf
                    end if
+
 !LR commented this out
 !                   if (.not.ind_sweeps.or.pass.eq.2) then
 !                    f_hf=0
@@ -1548,104 +1624,140 @@ c        parameter (w4=1.0d0/16.0d0,w3=1.0d0/16.0d0,w2=1.0d0/16.0d0)
 !LR: equivalent to the commented out piece below, but it does not go out of bounds
                    if (.not.ind_sweeps.or.pass.eq.3) then
                     f_hf=0
-                    if (k.gt.2.and.k.lt.(nz-1)) then
+                    applied=0
+                    if (k.gt.2.and.k.lt.(nz-1).and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-2).ne.ex.and.chr(i,j,k-1).ne.ex.and.
      &                    chr(i,j,k+2).ne.ex.and.chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i,j,k-2)+work(i,j,k+2)
      &                 -4*(work(i,j,k-1)+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.2.and.phys_bdy_type(5).eq.odd) then
+                    end if
+                    if (k.eq.2.and.phys_bdy_type(5).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-1).ne.ex.and.
      &                    chr(i,j,k+2).ne.ex.and.chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (-work(i,j,k))+work(i,j,k+2)
      &                 -4*(work(i,j,k-1)+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.1.and.phys_bdy_type(5).eq.odd) then
+                    end if
+                    if (k.eq.1.and.phys_bdy_type(5).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k+2).ne.ex.and.chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (-work(i,j,k+2))+work(i,j,k+2)
      &                -4*((-work(i,j,k+1))+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.Nz-1.and.phys_bdy_type(6).eq.odd) then
+                    end if
+                    if (k.eq.Nz-1.and.phys_bdy_type(6).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-2).ne.ex.and.chr(i,j,k-1).ne.ex.and.
      &                    chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i,j,k-2)+(-work(i,j,k))
      &                 -4*(work(i,j,k-1)+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.Nz.and.phys_bdy_type(6).eq.odd) then
+                    end if
+                    if (k.eq.Nz.and.phys_bdy_type(6).eq.odd.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-2).ne.ex.and.chr(i,j,k-1).ne.ex))
      &               then
                        f_hf=w4*(
      &                    work(i,j,k-2)+(-work(i,j,k-2))
      &                -4*(work(i,j,k-1)+(-work(i,j,k-1)))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.2.and.phys_bdy_type(5).eq.even) then
+                    end if
+                    if (k.eq.2.and.phys_bdy_type(5).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-1).ne.ex.and.
      &                    chr(i,j,k+2).ne.ex.and.chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (work(i,j,k))+work(i,j,k+2)
      &                 -4*(work(i,j,k-1)+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.1.and.phys_bdy_type(5).eq.even) then
+                    end if
+                    if (k.eq.1.and.phys_bdy_type(5).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k+2).ne.ex.and.chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                    (work(i,j,k+2))+work(i,j,k+2)
      &                -4*((work(i,j,k+1))+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.Nz-1.and.
-     &                       phys_bdy_type(6).eq.even) then
+                    end if
+                    if (k.eq.Nz-1.and.
+     &                       phys_bdy_type(6).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-2).ne.ex.and.chr(i,j,k-1).ne.ex.and.
      &                    chr(i,j,k+1).ne.ex))
      &               then
                        f_hf=w4*(
      &                     work(i,j,k-2)+(work(i,j,k))
      &                 -4*(work(i,j,k-1)+work(i,j,k+1))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.eq.Nz.and.phys_bdy_type(6).eq.even) then
+                    end if
+                    if (k.eq.Nz.and.phys_bdy_type(6).eq.even.and.
+     &               applied.eq.0) then
                      if ((chr(i,j,k-2).ne.ex.and.chr(i,j,k-1).ne.ex))
      &               then
                        f_hf=w4*(
      &                    work(i,j,k-2)+(work(i,j,k-2))
      &                -4*(work(i,j,k-1)+(work(i,j,k-1)))+6*work(i,j,k))
+                       applied=1
                      end if
-                    else if (k.gt.(2-bo1).and.k.lt.(nz-1)) then
+                    end if
+                    if (k.gt.(2-bo1).and.k.lt.(nz-1).and.
+     &               applied.eq.0) then
                      if (chr(i,j,k-1).ne.ex.and.chr(i,j,k+1).ne.ex.and.
      &                   chr(i,j,k+2).ne.ex)
      &               then
                        f_hf=w3*(
      &                    -work(i,j,k-1)+3*work(i,j,k)
      &                  -3*work(i,j,k+1)+work(i,j,k+2))
+                       applied=1
                      end if
-                    else if (k.gt.2.and.k.lt.(nz-1+bo1)) then
+                    end if
+                    if (k.gt.2.and.k.lt.(nz-1+bo1).and.
+     &               applied.eq.0) then
                      if (chr(i,j,k-1).ne.ex.and.chr(i,j,k+1).ne.ex.and.
      &                   chr(i,j,k-2).ne.ex)
      &               then
                        f_hf=w3*(
      &                    -work(i,j,k+1)+3*work(i,j,k)
      &                  -3*work(i,j,k-1)+work(i,j,k-2))
+                       applied=1
                      end if
-                    else if ((k.gt.(2-bo2).or.
+                    end if
+                    if ((k.gt.(2-bo2).or.
      &                       (k.eq.2.and.chr(i,j,1).eq.ex))
      &                       .and.k.lt.(nz-1).and.
-     &                  (chr(i,j,k+1).ne.ex.and.chr(i,j,k+2).ne.ex) )
-     &              then
+     &                  (chr(i,j,k+1).ne.ex.and.chr(i,j,k+2).ne.ex).and.
+     &               applied.eq.0) then
                        f_hf=w2*(
      &                     work(i,j,k)-2*work(i,j,k+1)+work(i,j,k+2))
+                       applied=1
                     else if (k.gt.2.and.(k.lt.(nz-1+bo2).or.
      &                       (k.eq.(nz-1).and.chr(i,j,nz).eq.ex)).and.
-     &                  (chr(i,j,k-1).ne.ex.and.chr(i,j,k-2).ne.ex) )
-     &              then
+     &                  (chr(i,j,k-1).ne.ex.and.chr(i,j,k-2).ne.ex).and.
+     &               applied.eq.0) then
                        f_hf=w2*(
      &                     work(i,j,k)-2*work(i,j,k-1)+work(i,j,k-2))
+                       applied=1
                     end if
 
                     f(i,j,k)=f(i,j,k)-eps_eff*f_hf
