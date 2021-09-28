@@ -14,7 +14,7 @@
 
 #define PAMR_MAX_NODES 1024
 
-#define PAMR_MAX_GFNS 512
+#define PAMR_MAX_GFNS 8192
 
 #define PAMR_SMALL_DX 1e-20
 
