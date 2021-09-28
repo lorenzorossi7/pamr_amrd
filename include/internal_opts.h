@@ -12,7 +12,7 @@
 /* increase when multiple contexts have been tested */
 #define PAMR_MAX_CONTEXTS 1
 
-#define PAMR_MAX_NODES 1024
+#define PAMR_MAX_NODES 8192
 
 #define PAMR_MAX_GFNS 512
 
