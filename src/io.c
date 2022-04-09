@@ -10,6 +10,7 @@
 #include <bbhutil.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h> //added by LR - new compilers seem to require this
 
 //=================================================================================
 // utility routines used by PAMR_cp

@@ -13,6 +13,7 @@
 #include "io.h"
 #include <stdlib.h>
 #include <mpi.h>
+#include <string.h> //added by LR - new compilers seem to require this
 
 //=============================================================================
 // The following routine sets the trace level:
